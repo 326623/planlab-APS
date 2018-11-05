@@ -10,15 +10,22 @@ else()
 endif()
 
 set(CMAKE_CXX_STANDARD 11)
-
+# dependency
 add_subdirectory( deps/or-tools )
+
+LIST(APPEND SOURCES
+  src/factoryWorld.cpp)
+add_library( Factory SHARED ${SOURCES} )
+target_include_directories( Factory PUBLIC "${CMAKE_CURRENT_LIST_DIR}/include" )
+target_link_libraries( Factory PUBLIC ortools::ortools Eigen3::Eigen )
+
 add_executable( firstApp src/test.cpp )
-target_link_libraries( firstApp ortools::ortools Eigen3::Eigen )
+target_link_libraries( firstApp Factory )
 
 add_executable( Simulator src/simpleSimulator.cpp )
 target_include_directories( Simulator PRIVATE "${CMAKE_CURRENT_LIST_DIR}/include" )
-target_link_libraries( Simulator ortools::ortools )
+target_link_libraries( Simulator Factory )
 
 add_executable( BOMGen src/BOMGen.cpp )
 target_include_directories( BOMGen PRIVATE "${CMAKE_CURRENT_LIST_DIR}/include" )
-target_link_libraries( BOMGen ortools::ortools )
+target_link_libraries( BOMGen Factory )
