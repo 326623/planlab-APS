@@ -32,33 +32,61 @@
 // small help from eigen to get inverse of BOM
 #include <Eigen/Dense>
 
+#include <fstream>
+#include <sstream>
+
 /**
  * Implementation of processing raw data(input) into internel factoryWorld representation
  */
 
 namespace FactoryWorld {
+  // should guarantee that these are streamable
   using Integral = int;
   using Float = double;
   using IndexType = unsigned int;
+  using TimeUnit = int;
 
   class Factory {
     class Machine {
     private:
+      // which product the machine can process
       std::vector<bool> capableProduct_;
+      // how many product per unit time(assume hours)
       std::vector<Float> capability_;
+      // machine not functional before readyTime_
+      // (work already scheduled on the machine)
+      Float readyTime_;
     public:
       explicit Machine() {}
       explicit Machine(std::vector<Float> capability) :
         capableProduct_(capability.size()), capability_(capability)
       {
-        // NOTE: don't know if this floating point comparison would be an issue
+        ASSERT_GT(capability_, 0.0);
+        // NOTE: don't know if this floating point comparison
+        // would be an issue
         std::transform(capability_.cbegin(), capability_.cend(),
-                       capableProduct_.begin(), [](Float x) { return x > 0.0; });
+                       capableProduct_.begin(),
+                       [](Float x) { return x > 0.0; });
       }
 
+      std::vector<bool> & getCapableProduct() const
+      { return capableProduct_; }
+
+      std::vector<Float> & getCapability() const
+      { return capability_; }
+
+      const Float & getReadyTime() const
+      { return readyTime_; }
     };
 
-    class BillOfMaterial {
+    /**
+     * Generalize from Bill of Material model
+     * This class contains the information between products
+     * i.e, which two product has dependency
+     * which two product has to be kept apart for some time
+     * which two product
+     */
+    class RelationOfProducts {
     private:
       // bill of material matrix
       MatrixXd bom_;
@@ -70,22 +98,72 @@ namespace FactoryWorld {
     public:
       explicit BillOfMaterial() {}
       explicit BillOfMaterial(MatrixXd bom) :
-        bom_(bom), predecessor_((MatrixXd::Identity(bom.rows(), bom.cols()) - bom_).inverse())
-      { requiredMask_ = bom_.array() > 0.0; }
+        bom_(bom), predecessor_(
+          (MatrixXd::Identity(bom.rows(), bom.cols()) - bom_).inverse())
+      {
+        // NOTE: might need to consider predecessor.
+        // Its floating point is inaccurate
+        ASSERT_GT(bom_, 0.0);
+        requiredMask_ = bom_.array() > 0.0;
+      }
+
+      const MatrixXd & getBOM() const { return bom_; }
+      const MatrixXd & getPredecessor() const { return predecessor_; }
+      const Matrix<bool, Dynamic, Dynamic> & getRequiredMask() const
+      { return requiredMask_; }
     };
 
     class Order {
     private:
-      std::vector<IndexType> productQuan_;
+      std::vector<Integral> productQuan_;
       std::vector<Integral> productType_;
-
+      Float dueTime_;
+      Integral clientID_;
+      Integral materialDate_; // raw material time
     public:
+      explicit Order(std::vector<Integral> productQuan,
+                     std::vector<Integral> productType,
+                     Float dueTime, Integral clientID, Integral materialDate)
+        : productQuan_(productQuan), productType_(productType),
+          dueTime(dueTime_), clientID_(clientID), materialDate_(materialDate)
+      { }
 
+      explicit Order(std::ifstream &);
+
+      const std::vector<Integral> &
+      getProductQuan() const { return productQuan_; }
+
+      const std::vector<Integral> &
+      getProductType() const { return productType_; }
+
+      Float getDueTime() const { return dueTime_; }
+
+      Integral getClientID() const { return clientID_; }
     };
 
   private:
+    std::vector<Machine> machines__;
+    BillOfMaterial bom__;
+    std::vector<Order> orders__;
 
+    Float tardyCost_;
+    Float earlyCost_;
+    Float idleCost_;
   public:
+    explicit Factory() {}
+
+    // Load data from file, given the path to file
+    void load(const std::string &filename);
+
+    const BillOfMaterial & getBOM() const
+    { return bom__; }
+
+    const std::vector<Order> & getOrders() const
+    { return orders__; }
+
+    const std::vector<Machine> &getMachines() const
+    { return machines__; }
+
   };
 
 }
