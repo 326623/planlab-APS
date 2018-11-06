@@ -67,7 +67,7 @@ namespace Simulator
     const auto &deadline = order.deadline;
     out << size << ' ';
     for (auto i = 0ul; i < size; ++ i) {
-      out << ids[i] << ' ' << nums[i];
+      out << ids[i] << ' ' << nums[i] << ' ';
     }
     out << ' ' << materialDate << ' ' << deadline << ' ' << client;
     return out;
@@ -106,21 +106,22 @@ namespace Simulator
                             std::pair<Integral, Integral> minMax) :
       _partNum(partNums), _leadScale(leadScale), _gen(_randomDev()),
       _productNumRand(minMax.first, minMax.second), _clientIdRand(0, clientSize),
-      _typeRand(0, partNums), _scaleRand(0, leadScale.size()-1)
+      _typeRand(0, partNums/2-1), _scaleRand(0, leadScale.size()-1)
     { }
 
     Order<Integral> operator() (Integral startTime) const {
-      const auto productNum = _productNumRand(_gen);
+      const auto productNum = _typeRand(_gen);
       const auto clientId = _clientIdRand(_gen);
       // for simplicity, just use one type product
-      const auto firstTypeNum = _typeRand(_gen);
+      const auto firstTypeNum = _productNumRand(_gen);
       // used to scale time for product size
       // (product size linear to production time)
       const auto scaleRate = _leadScale[_scaleRand(_gen)];
       const auto materialDate = startTime;
       const auto deadline = startTime + scaleRate * productNum;
       return Order<Integral> (clientId, materialDate, deadline,
-                              {productNum}, {firstTypeNum});
+                              {productNum, productNum + _partNum / 2},
+                              {firstTypeNum, firstTypeNum});
     }
 
     void setStartTime(Integral startTime)

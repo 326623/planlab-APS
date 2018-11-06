@@ -38,7 +38,8 @@
 #include <sstream>
 
 /**
- * Implementation of processing raw data(input) into internel factoryWorld representation
+ * Implementation of processing raw data(input) into internel
+ * factoryWorld representation
  */
 
 namespace FactoryWorld {
@@ -72,6 +73,15 @@ namespace FactoryWorld {
                      capableProduct_.begin(),
                      [](Float x) { return x > 0.0; });
     }
+
+    // return true if the machine is capable of manufacturing
+    // this type of product(by index)
+    bool capable(Integral typeIndex) const
+    { return capableProduct_[typeIndex]; }
+
+    // compute production time when given product type and its quantity
+    Float produceTime(Integral typeIndex, Integral numProduct) const
+    { return static_cast<double>(numProduct) / capability_[typeIndex]; }
 
     const std::vector<bool> & getCapableProduct() const
     { return capableProduct_; }
@@ -178,23 +188,7 @@ namespace FactoryWorld {
   };
 
   // for debugging
-  std::ostream &operator<< (std::ostream &out, const Order &order) {
-    const auto & productQuan = order.getProductQuan();
-    const auto & productType = order.getProductType();
-    const auto dueTime = order.getDueTime();
-    const auto clientID = order.getClientID();
-    const auto materialDate = order.getMaterialDate();
-
-    out << "client " << clientID << " order ";
-    IndexType size = productType.size();
-    for (IndexType i = 0; i < size; ++ i) {
-      out << productQuan[i] << " of product "
-          << productType[i] << '\n';
-    }
-    out << "Due at " << dueTime << '\n';
-    out << "Material arrived at " << materialDate << '\n';
-    return out;
-  }
+  std::ostream &operator<< (std::ostream &out, const Order &order);
 
   /**
    * Scheduler class handles the planning by expressing it under
@@ -208,7 +202,7 @@ namespace FactoryWorld {
     using MPSolver = operations_research::MPSolver;
   private:
     // this variable is computed using orders and machines
-    std::vector<std::vector<TimeUnit>> timeNeeded__;
+    std::vector<std::vector<std::vector<TimeUnit>>> productionTime__;
     const Factory *factory__;
 
     // used to compute time needed for each order or products on each machine
@@ -216,7 +210,7 @@ namespace FactoryWorld {
 
   public:
     explicit Scheduler() {}
-    void factoryScheduler(const Factory *factory,
+    void factoryScheduler(const Factory &factory,
       MPSolver::OptimizationProblemType optimization_problem_type);
   };
 }

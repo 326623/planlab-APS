@@ -6,7 +6,7 @@ int main() {
   // sadly can't use namespace, a conflict of class and namespace
   std::pair<int, int> productSizeRange = {0, 1000};
   auto numClients = 18;
-  auto productTypeSize = 300;
+  auto productTypeSize = 200;
   Simulator::OrderGenerator<int> orderGen(productTypeSize,
                                           {1e-5, 1e-4, 1e-3, 1e-2, 1e-1},
                                           numClients,

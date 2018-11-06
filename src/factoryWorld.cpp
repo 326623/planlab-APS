@@ -140,4 +140,23 @@ namespace FactoryWorld {
     }
     LOG(INFO) << orderSize << " orders added";
   }
+
+  std::ostream &operator<< (std::ostream &out, const Order &order) {
+    const auto & productQuan = order.getProductQuan();
+    const auto & productType = order.getProductType();
+    const auto dueTime = order.getDueTime();
+    const auto clientID = order.getClientID();
+    const auto materialDate = order.getMaterialDate();
+
+    out << "client " << clientID << " order ";
+    IndexType size = productType.size();
+    for (IndexType i = 0; i < size; ++ i) {
+      out << productQuan[i] << " of product "
+          << productType[i] << '\n';
+    }
+    out << "Due at " << dueTime << '\n';
+    out << "Material arrived at " << materialDate << '\n';
+    return out;
+  }
+
 }
