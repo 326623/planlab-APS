@@ -14,7 +14,8 @@ set(CMAKE_CXX_STANDARD 11)
 add_subdirectory( deps/or-tools )
 
 LIST(APPEND SOURCES
-  src/factoryWorld.cpp)
+  src/factoryWorld.cpp
+  src/scheduler.cpp)
 add_library( Factory SHARED ${SOURCES} )
 target_include_directories( Factory PUBLIC "${CMAKE_CURRENT_LIST_DIR}/include" )
 target_link_libraries( Factory PUBLIC ortools::ortools Eigen3::Eigen )

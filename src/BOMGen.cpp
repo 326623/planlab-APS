@@ -22,7 +22,7 @@ int main(int argc, char **argv) {
               << 1 << ' ' << 2 * numType + i << '\n';
   }
   for (int i = 0; i < 2 * numType; ++ i) {
-    std::cout << i << ' ' << 0 << '\n';
+    std::cout << i + numType << ' ' << 0 << '\n';
   }
   return 0;
 }

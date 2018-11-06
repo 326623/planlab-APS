@@ -16,17 +16,17 @@ namespace FactoryWorld {
     if (!inputStream) {
       LOG(FATAL) << "Product size should be positive integer";
     }
-    CHECK_GE(typePerOrder, 0);
-    CHECK_LT(typePerOrder, productTypeSize);
+    CHECK_GT(typePerOrder, 0);
     std::vector<Integral> productType(typePerOrder);
     std::vector<Integral> productQuan(typePerOrder);
     TimeUnit materialDate;
     TimeUnit dueTime;
     Integral clientID;
     for (Integral i = 0; i < typePerOrder; ++ i) {
-      inputStream >> productQuan[i] >> productType[i];
-      CHECK_EQ(productType[i], 0);
-      CHECK_EQ(productType[i], 0);
+      inputStream >> productType[i] >> productQuan[i];
+      CHECK_GE(productQuan[i], 0);
+      CHECK_GE(productType[i], 0);
+      CHECK_LT(productType[i], productTypeSize);
     }
 
     inputStream >> materialDate >> dueTime >> clientID;
@@ -42,20 +42,14 @@ namespace FactoryWorld {
   inline void processBOM(InputStream &inputStream,
                          Eigen::MatrixXd &bom,
                          Integral productTypeSize) {
-    std::string lineBuffer;
-    if (!std::getline(inputStream, lineBuffer))
-      LOG(FATAL) << "Out of line to process on BOM!";
-    std::stringstream lineStream(lineBuffer);
-    std::cout << lineBuffer << '\n';
     // product type and its predecessor
-    Integral productType, dependentType;
+    Integral productType, dependentType, sizeOfTypes;
     Float dependentSize;
-    lineStream >> productType;
+    inputStream >> productType >> sizeOfTypes;
     CHECK_GE(productType, 0);
     CHECK_LT(productType, productTypeSize);
-    while (lineStream >> dependentType) {
-      if (!(lineStream >> dependentSize))
-        LOG(FATAL) << "Bad format in bill of material";
+    for (Integral i = 0; i < sizeOfTypes; ++ i) {
+      inputStream >> dependentSize >> dependentType;
       CHECK_GE(dependentType, 0);
       CHECK_LT(dependentType, productTypeSize);
       // size must be larger than zero, otherwise no dependency
@@ -73,15 +67,16 @@ namespace FactoryWorld {
   template <typename InputStream>
   inline Machine processMachine(InputStream &inputStream,
                                 Integral productTypeSize) {
-    std::string lineBuffer;
-    if (!std::getline(inputStream, lineBuffer))
-      LOG(FATAL) << "Out of line to Process on machine";
-    std::stringstream stream(lineBuffer);
-    std::vector<Float> capability(productTypeSize);
+    std::vector<Float> capability(productTypeSize, 0.0);
     for (Integral i = 0; i < productTypeSize; ++ i) {
-      stream >> capability[i];
+      if (!(inputStream >> capability[i]))
+        LOG(FATAL) << "bad machine format";
     }
-    return Machine(capability);
+    Float readyTime;
+    if (!(inputStream >> readyTime)) {
+      LOG(FATAL) << "Machine ready time not found";
+    }
+    return Machine(capability, readyTime);
   }
 
   template <typename InputStream>
@@ -106,17 +101,16 @@ namespace FactoryWorld {
     Integral productTypeSize;
     inputStream >> productTypeSize;
     CHECK_GE(productTypeSize, 0);
-    LOG(INFO) << "added " << productTypeSize << " products";
     if (!inputStream)
       LOG(FATAL) << "Size of product type should be integer";
 
     // process BOM
     Eigen::MatrixXd bom(productTypeSize, productTypeSize);
     for (Integral i = 0; i < productTypeSize; ++ i) {
-      LOG(INFO) << i << '\n';
       processBOM(inputStream, bom, productTypeSize);
     }
     bom__ = RelationOfProducts(bom);
+    LOG(INFO) << productTypeSize << " products added";
 
     // process machines
     Integral machineSize;
@@ -130,6 +124,7 @@ namespace FactoryWorld {
       machines__[i] = processMachine(inputStream,
                                      productTypeSize);
     }
+    LOG(INFO) << machineSize << " machines added";
 
     // process orders
     Integral orderSize, clientSize;
@@ -143,5 +138,6 @@ namespace FactoryWorld {
     for (Integral i = 0; i < orderSize; ++ i) {
       orders__[i] = processOrder(inputStream, productTypeSize);
     }
+    LOG(INFO) << orderSize << " orders added";
   }
 }

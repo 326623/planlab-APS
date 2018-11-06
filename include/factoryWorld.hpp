@@ -28,6 +28,8 @@
 #include <ortools/base/logging.h>
 #include <ortools/base/filelineiter.h>
 #include <ortools/base/split.h>
+#include <ortools/constraint_solver/constraint_solver.h>
+#include <ortools/linear_solver/linear_solver.h>
 
 // small help from eigen to get inverse of BOM
 #include <Eigen/Dense>
@@ -44,7 +46,7 @@ namespace FactoryWorld {
   using Integral = int;
   using Float = double;
   using IndexType = unsigned int;
-  using TimeUnit = int;
+  using TimeUnit = double;
 
   class Machine {
   private:
@@ -57,12 +59,13 @@ namespace FactoryWorld {
     Float readyTime_;
   public:
     explicit Machine() {}
-    explicit Machine(std::vector<Float> capability) :
-      capableProduct_(capability.size()), capability_(capability)
+    explicit Machine(std::vector<Float> capability, Float readyTime) :
+      capableProduct_(capability.size()), capability_(capability),
+      readyTime_(readyTime)
     {
-      // all capability should be above zero
+      // all capability should be above or equal to zero
       for (const auto & cap : capability_)
-        CHECK_GT(cap, 0.0);
+        CHECK_GE(cap, 0.0);
       // NOTE: don't know if this floating point comparison
       // would be an issue
       std::transform(capability_.cbegin(), capability_.cend(),
@@ -106,7 +109,7 @@ namespace FactoryWorld {
     {
       // NOTE: might need to consider predecessor.
       // Its floating point is inaccurate
-      CHECK((bom_.array() > 0.0).all());
+      CHECK((bom_.array() >= 0.0).all());
       requiredMask_ = bom_.array() > 0.0;
     }
 
@@ -130,7 +133,7 @@ namespace FactoryWorld {
                    Float dueTime, Integral clientID, Integral materialDate)
       : productQuan_(productQuan), productType_(productType),
         dueTime_(dueTime), clientID_(clientID), materialDate_(materialDate)
-    { }
+    { CHECK_EQ(productQuan.size(), productType.size()); }
 
     explicit Order(std::ifstream &);
 
@@ -143,6 +146,8 @@ namespace FactoryWorld {
     Float getDueTime() const { return dueTime_; }
 
     Integral getClientID() const { return clientID_; }
+
+    Integral getMaterialDate() const { return materialDate_; }
   };
 
 
@@ -172,6 +177,48 @@ namespace FactoryWorld {
 
   };
 
+  // for debugging
+  std::ostream &operator<< (std::ostream &out, const Order &order) {
+    const auto & productQuan = order.getProductQuan();
+    const auto & productType = order.getProductType();
+    const auto dueTime = order.getDueTime();
+    const auto clientID = order.getClientID();
+    const auto materialDate = order.getMaterialDate();
+
+    out << "client " << clientID << " order ";
+    IndexType size = productType.size();
+    for (IndexType i = 0; i < size; ++ i) {
+      out << productQuan[i] << " of product "
+          << productType[i] << '\n';
+    }
+    out << "Due at " << dueTime << '\n';
+    out << "Material arrived at " << materialDate << '\n';
+    return out;
+  }
+
+  /**
+   * Scheduler class handles the planning by expressing it under
+   * linear constraint
+   *
+   * Itself would takes some unmutable Factory as data input
+   * compute and store some temporary variables
+   */
+  class Scheduler {
+    //using namespace operations_research;
+    using MPSolver = operations_research::MPSolver;
+  private:
+    // this variable is computed using orders and machines
+    std::vector<std::vector<TimeUnit>> timeNeeded__;
+    const Factory *factory__;
+
+    // used to compute time needed for each order or products on each machine
+    void computeTimeNeeded();
+
+  public:
+    explicit Scheduler() {}
+    void factoryScheduler(const Factory *factory,
+      MPSolver::OptimizationProblemType optimization_problem_type);
+  };
 }
 
 #endif /* _NEWJOY_FACTORYWORLD_HPP_ */

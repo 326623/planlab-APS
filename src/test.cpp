@@ -35,4 +35,16 @@ int main(int argc, char **argv) {
   using namespace FactoryWorld;
   Factory myFactory;
   myFactory.load(FLAGS_factory_world);
+  // std::cout << myFactory.getBOM().getBOM() << '\n';
+
+  // for (const auto &machine : myFactory.getMachines()) {
+  //   for (const auto cap : machine.getCapability()) {
+  //     std::cout << cap << ' ';
+  //   }
+  //   std::cout << '\n';
+  // }
+
+  // for (const auto & order : myFactory.getOrders()) {
+  //   std::cout << order << '\n';
+  // }
 }
