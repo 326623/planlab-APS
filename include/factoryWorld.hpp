@@ -37,6 +37,7 @@
 #include <fstream>
 #include <sstream>
 
+#include "utils.hpp"
 /**
  * Implementation of processing raw data(input) into internel
  * factoryWorld representation
@@ -109,8 +110,9 @@ namespace FactoryWorld {
     // The product required directly or indirectly,
     // computed directly from bom_
     MatrixXd predecessor_;
-    // a bool matrix to check if a product is dependent on another product
-    MatrixB requiredMask_;
+    // a bool matrix to check if a product is directly dependent on another product
+    MatrixB directMask_;
+    MatrixB inAndDirectMask_;
   public:
     explicit RelationOfProducts() {}
     explicit RelationOfProducts(MatrixXd bom) :
@@ -119,18 +121,26 @@ namespace FactoryWorld {
     {
       // NOTE: might need to consider predecessor.
       // Its floating point is inaccurate
-      CHECK((bom_.array() >= 0.0).all());
-      requiredMask_ = bom_.array() > 0.0;
+      CHECK((bom_.array() >= 0.0).all()) << "Bom list error! No negative pls.";
+      // for (auto i = 0ul; i < predecessor_.cols(); ++ i)
+      //   for (auto j = 0ul; j < predecessor_.rows(); ++ j)
+      //     if (utils::almost_equal(predecessor_(i, j), 0.0))
+      //       predecessor_(i, j) = 0.0;
+      assert((predecessor_.array() >= 0.0).all() && "possibly floating error.");
+      directMask_ = bom_.array() > 0.0;
+      inAndDirectMask_ = predecessor_.array() > 0.0;
     }
 
-    const MatrixXd & getBOM() const { return bom_; }
-    const MatrixXd & getPredecessor() const { return predecessor_; }
-    const MatrixB & getRequiredMask() const
-    { return requiredMask_; }
+    const MatrixXd &getBOM() const { return bom_; }
+    const MatrixXd &getPredecessor() const { return predecessor_; }
+    const MatrixB &getDirectMask() const
+    { return directMask_; }
+    const MatrixB &getInAndDirectMask() const
+    { return inAndDirectMask_; }
   };
 
   class Order {
-  private:
+  protected:
     std::vector<Integral> productQuan_;
     std::vector<Integral> productType_;
     Float dueTime_;
@@ -163,6 +173,7 @@ namespace FactoryWorld {
 
   class Factory {
   private:
+    constexpr static double infinity = std::numeric_limits<double>::infinity();
     std::vector<Machine> machines__;
     RelationOfProducts bom__;
     std::vector<Order> orders__;
@@ -198,15 +209,51 @@ namespace FactoryWorld {
    * compute and store some temporary variables
    */
   class Scheduler {
-    //using namespace operations_research;
-    using MPSolver = operations_research::MPSolver;
   private:
-    // this variable is computed using orders and machines
+
+    class OrderWithDep : public Order {
+    private:
+      // computed from bom
+      std::vector<Integral> productQuanDep__;
+      std::vector<Integral> productTypeDep__;
+
+    public:
+      explicit OrderWithDep()
+      { }
+      explicit OrderWithDep(Order noDepOrder,
+                            const RelationOfProducts &bom);
+    };
+    //using namespace operations_research;
+    using MatrixB = Eigen::Matrix<bool, Eigen::Dynamic, Eigen::Dynamic>;
+    using MPSolver = operations_research::MPSolver;
+    using MPConstraint = operations_research::MPConstraint;
+    using MPVariable = operations_research::MPVariable;
+    using Var3D = std::vector<std::vector<std::vector<MPVariable *>>>;
+    constexpr static double infinity = std::numeric_limits<double>::infinity();
+    constexpr static double largeNumber = std::numeric_limits<double>::max();
+    // this variable is computed using orders and machines, and would be extended
+    // to include the dependent products
     std::vector<std::vector<std::vector<TimeUnit>>> productionTime__;
+    std::vector<std::vector<bool>> finalProduct__;
+
     const Factory *factory__;
 
     // used to compute time needed for each order or products on each machine
-    void computeTimeNeeded();
+    inline void computeTimeNeeded();
+
+    inline void addConstraints_1(
+      std::vector<MPVariable *> completionTimes,
+      MPVariable const *makeSpan,
+      MPSolver &solver,
+      const std::string &purposeMessage);
+
+    inline void addConstraints_2(
+      const std::vector<std::vector<MPVariable *>> &startTime,
+      const std::vector<MPVariable *> &completionTimes,
+      const Var3D &onMachine,
+      const Factory &factory,
+      MPSolver &solver,
+      const std::string &purposeMessage);
 
   public:
     explicit Scheduler() {}

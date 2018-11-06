@@ -3,9 +3,9 @@ project( planlab_ASP VERSION 0.1 )
 find_package( Eigen3 3.3 REQUIRED NO_MODULE)
 
 if(MSVC)
-  add_compile_options(/W3 /WX)
+  #add_compile_options(/W3 /WX)
 else()
-  add_compile_options(-W -Wall)
+  #add_compile_options(-W -Wall)
   #add_compile_options(-W -Wall)
 endif()
 
