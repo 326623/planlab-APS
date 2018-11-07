@@ -9,17 +9,85 @@ namespace FactoryWorld {
     : Order(noDepOrder)
   {
     const auto &inAndDirectMask = bom.getInAndDirectMask();
+    // 1 unit of product i requires how many unit of j => predecessor(i, j)
+    const auto &predecessor = bom.getPredecessor();
 
     // dependent type, excluding themselves
     const auto dependentMask = inAndDirectMask -
       MatrixB::Identity(inAndDirectMask.rows(),
                         inAndDirectMask.cols());
 
+    const auto &finalProdQuan = productQuan_;
+    const auto &finalProdType = productType_;
+
+    for (auto i = 0ul; i < finalProdQuan.size(); ++ i) {
+      const auto &typeIndex = finalProdType[i];
+      const auto &prodNum = finalProdQuan[i];
+      for (auto j = 0ul; j < dependentMask.cols(); ++ j) {
+        if (dependentMask(typeIndex, j)) {
+          productTypeDep__.emplace_back(j);
+          productQuanDep__.emplace_back(prodNum * predecessor(typeIndex, j));
+          DLOG(INFO) << prodNum << " of " << typeIndex << " relies on "
+                     << prodNum * predecessor(typeIndex, j) << " of " << j;
+        }
+      }
+    }
+  }
+
+  /**
+   * transfrom product number to time using each machine's capability
+   *
+   * Need to mark if this product is the final product to reduce number of
+   * constraints for solver
+   * if the machine isn't capable of manufacturing this type of product
+   * takes infinity time to produce
+   *
+   */
+  template <bool isFinal>
+  inline void productNum2Time(
+    std::vector<std::vector<std::vector<TimeUnit>>> &productionTime,
+    std::vector<std::vector<bool>> &finalProduct,
+    std::vector<Machine> &machines)
+  {
+    auto &currentOrder = productionTime__[i];
+    const auto &order = orders[i];
+    const auto &productQuan = order.getProductQuan();
+    const auto &productType = order.getProductType();
+    // how many products type
+    const auto typeSize = productQuan.size();
+    currentOrder.resize(typeSize);
+    // productQuan.size() == productType.size() assumed
+    // per product in order
+    for (auto j = 0ul; j < typeSize; ++ j) {
+      const auto &numProduct = productQuan[j];
+      const auto &typeIndex = productType[j];
+      // product j of order i
+      auto &currentProduct = currentOrder[j];
+      currentProduct.resize(machines.size());
+      // per machine
+      for (auto k = 0ul; k < machines.size(); ++ k) {
+        const auto &machine = machines[i];
+        if (machine.capable(typeIndex)) {
+          currentProduct[k] = infinity;
+        }
+        else {
+          currentProduct[k] =
+            machine.produceTime(typeIndex, numProduct);
+        }
+      }
+    }
   }
 
   void Scheduler::computeTimeNeeded() {
     const auto &bom = factory__->getBOM();
-    const auto &orders = factory__->getOrders();
+    std::vector<OrderWithDep> orders(factory__->getOrders().size());
+    std::transform(factory__->getOrders().cbegin(),
+                   factory__->getOrders().cend(),
+                   orders.begin(),
+                   [this](const Order &orderNoDep) {
+                     return OrderWithDep(orderNoDep,
+                                         factory__->getBOM());
+                   });
     const auto &machines = factory__->getMachines();
 
     // predecessor matrix, each row corresponds to dependent product number

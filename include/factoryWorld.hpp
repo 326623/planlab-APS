@@ -103,7 +103,8 @@ namespace FactoryWorld {
    */
   class RelationOfProducts {
     using MatrixXd = Eigen::MatrixXd;
-    using MatrixB = Eigen::Matrix<bool, Eigen::Dynamic, Eigen::Dynamic>;
+    using MatrixB = Eigen::Matrix<bool, Eigen::Dynamic,
+                                  Eigen::Dynamic, Eigen::RowMajor>;
   private:
     // bill of material matrix
     MatrixXd bom_;
@@ -124,7 +125,7 @@ namespace FactoryWorld {
       CHECK((bom_.array() >= 0.0).all()) << "Bom list error! No negative pls.";
       // for (auto i = 0ul; i < predecessor_.cols(); ++ i)
       //   for (auto j = 0ul; j < predecessor_.rows(); ++ j)
-      //     if (utils::almost_equal(predecessor_(i, j), 0.0))
+      //     if (utils::almost_equal(predecessor_(j, i), 0.0))
       //       predecessor_(i, j) = 0.0;
       assert((predecessor_.array() >= 0.0).all() && "possibly floating error.");
       directMask_ = bom_.array() > 0.0;
@@ -223,6 +224,7 @@ namespace FactoryWorld {
       explicit OrderWithDep(Order noDepOrder,
                             const RelationOfProducts &bom);
     };
+
     //using namespace operations_research;
     using MatrixB = Eigen::Matrix<bool, Eigen::Dynamic, Eigen::Dynamic>;
     using MPSolver = operations_research::MPSolver;
