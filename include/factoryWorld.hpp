@@ -223,6 +223,12 @@ namespace FactoryWorld {
       { }
       explicit OrderWithDep(Order noDepOrder,
                             const RelationOfProducts &bom);
+
+      const std::vector<Integral> &getProductQuanDep() const
+      { return productQuanDep__; }
+
+      const std::vector<Integral> &getProductTypeDep() const
+      { return productTypeDep__; }
     };
 
     //using namespace operations_research;
@@ -242,6 +248,14 @@ namespace FactoryWorld {
 
     // used to compute time needed for each order or products on each machine
     inline void computeTimeNeeded();
+
+    template <bool isFinal>
+    inline void productNum2Time(
+      std::vector<std::vector<TimeUnit>> &productionTime,
+      std::vector<bool> &finalProduct,
+      const std::vector<Machine> &machines,
+      const std::vector<Integral> &productQuan,
+      const std::vector<Integral> &productType);
 
     inline void addConstraints_1(
       std::vector<MPVariable *> completionTimes,

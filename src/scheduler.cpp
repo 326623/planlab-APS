@@ -42,31 +42,36 @@ namespace FactoryWorld {
    * if the machine isn't capable of manufacturing this type of product
    * takes infinity time to produce
    *
+   * productionTime(j, k) records the time needed on machine k
+   * for product j
+   *
+   * finalProduct is the boolean mask to tell whether some product
+   * is the finalProduct corresponding to productionTime
+   * the dep suffix means false
    */
   template <bool isFinal>
-  inline void productNum2Time(
-    std::vector<std::vector<std::vector<TimeUnit>>> &productionTime,
-    std::vector<std::vector<bool>> &finalProduct,
-    std::vector<Machine> &machines)
+  inline void Scheduler::
+  productNum2Time(
+    std::vector<std::vector<TimeUnit>> &productionTime,
+    std::vector<bool> &finalProduct,
+    const std::vector<Machine> &machines,
+    const std::vector<Integral> &productQuan,
+    const std::vector<Integral> &productType)
   {
-    auto &currentOrder = productionTime__[i];
-    const auto &order = orders[i];
-    const auto &productQuan = order.getProductQuan();
-    const auto &productType = order.getProductType();
-    // how many products type
+    assert(productQuan.size() == productType.size());
     const auto typeSize = productQuan.size();
-    currentOrder.resize(typeSize);
-    // productQuan.size() == productType.size() assumed
-    // per product in order
     for (auto j = 0ul; j < typeSize; ++ j) {
       const auto &numProduct = productQuan[j];
       const auto &typeIndex = productType[j];
-      // product j of order i
-      auto &currentProduct = currentOrder[j];
-      currentProduct.resize(machines.size());
+
+      productionTime.emplace_back(
+        std::vector<TimeUnit>(machines.size()));
+      finalProduct.emplace_back(isFinal);
+      // newly added
+      auto &currentProduct = productionTime.back();
       // per machine
       for (auto k = 0ul; k < machines.size(); ++ k) {
-        const auto &machine = machines[i];
+        const auto &machine = machines[k];
         if (machine.capable(typeIndex)) {
           currentProduct[k] = infinity;
         }
@@ -91,11 +96,6 @@ namespace FactoryWorld {
     const auto &machines = factory__->getMachines();
 
     // predecessor matrix, each row corresponds to dependent product number
-    const auto &requiredMask = factory__->getBOM().getDirectMask();
-    const auto &predcessor = factory__->getBOM().getPredecessor();
-
-    // extend preductionTime
-    // productionTime__.resize(orders.size());
 
     // need to expand product by including
     // the dependent products on each order
@@ -103,32 +103,27 @@ namespace FactoryWorld {
     // per order
     for (auto i = 0ul; i < productionTime__.size(); ++ i) {
       auto &currentOrder = productionTime__[i];
+      auto &finalProd = finalProduct__[i];
       const auto &order = orders[i];
       const auto &productQuan = order.getProductQuan();
       const auto &productType = order.getProductType();
+      const auto &productQuanDep = order.getProductQuanDep();
+      const auto &productTypeDep = order.getProductTypeDep();
+
+      assert(productQuan.size() == productType.size() &&
+             productQuanDep.size() == productTypeDep.size());
       // how many products type
       const auto typeSize = productQuan.size();
-      currentOrder.resize(typeSize);
-      // productQuan.size() == productType.size() assumed
+      const auto typeSizeDep = productQuanDep.size();
+      currentOrder.reserve(typeSize + typeSizeDep);
       // per product in order
-      for (auto j = 0ul; j < typeSize; ++ j) {
-        const auto &numProduct = productQuan[j];
-        const auto &typeIndex = productType[j];
-        // product j of order i
-        auto &currentProduct = currentOrder[j];
-        currentProduct.resize(machines.size());
-        // per machine
-        for (auto k = 0ul; k < machines.size(); ++ k) {
-          const auto &machine = machines[i];
-          if (machine.capable(typeIndex)) {
-            currentProduct[k] = infinity;
-          }
-          else {
-            currentProduct[k] =
-              machine.produceTime(typeIndex, numProduct);
-          }
-        }
-      }
+      // true => final product of the order
+      productNum2Time<true>
+        (currentOrder, finalProd, machines,
+         productQuan, productType);
+      productNum2Time<false>
+        (currentOrder, finalProd, machines,
+         productQuanDep, productTypeDep);
     }
   }
 
@@ -162,6 +157,7 @@ namespace FactoryWorld {
     const auto &machines = factory.getMachines();
     const auto &orders = factory.getOrders();
     const auto &productionTime = productionTime__;
+    const auto &finalProduct = finalProduct__;
     // here startTime one to one mapps to orders
     // with index, referring to underly products
 
@@ -169,6 +165,7 @@ namespace FactoryWorld {
     // per order, per startTime. same thing
     for (auto i = 0ul; i < startTime.size(); ++ i) {
       const auto &prodStartTimes = startTime[i];
+      const auto &finalProd = finalProduct[i];
       const auto &currentOrder = orders[i];
       const auto &productType = currentOrder.getProductType();
 
@@ -176,6 +173,10 @@ namespace FactoryWorld {
       // assume currentOrder.size() == prodStartTime.size()
       // per product of order
       for (auto j = 0ul; j < prodStartTimes.size(); ++ j) {
+        // if this isn't the final product of the order
+        // just skip the constraints
+        if (!finalProd[j]) continue;
+
         const auto &typeIndex = productType[j];
         const auto &prodStart = prodStartTimes[j];
         // per machine that is capable
@@ -201,6 +202,14 @@ namespace FactoryWorld {
     LOG(INFO) << purposeMessage;
   }
 
+  inline void Scheduler::
+  addConstraints_3(const std::vector<std::vector<MPVariable *>> &startTime,
+                   const std::vector<MPVariable *> &completionTimes,
+                   const Var3D &onMachine, const Factory &factory,
+                   MPSolver &solver, const std::string &purposeMessage)
+  {
+
+  }
 
 
   void Scheduler::factoryScheduler(const Factory &factory,
