@@ -6,6 +6,54 @@
 namespace FactoryWorld {
   using MPConstraint = operations_research::MPConstraint;
 
+  /**
+   * use a data structure to hold all the tuple
+   * <i, j, productType> then iterate all permutation of pair
+   * to find all possible gap between productTypes O(N^2).
+   * given the symmetric property. only half of permutation is required
+   *
+   * after finding gapped productType, iterate all possible permutation
+   * of two lists and add to the gap__ field O(NM)
+   * N = num product of gapped type p, M = num product of gapped type q
+   */
+  void Scheduler::DataProvider::buildGap() {
+    const auto typeSize = factory__->getBOM().getTypeSize();
+    const auto &gap = factory__->getBOM().getGap();
+    const auto &gapMask = factory__->getBOM().getGapMask();
+    std::vector<std::vector<
+      std::pair<Integral, Integral>>> typeInfo(typeSize);
+    const auto &orders = orders__;
+
+    // fill in all orders
+    for (auto i = 0ul; i < orders.size(); ++ i) {
+      const auto &prodType = orders[i].getProductType();
+      for (auto j = 0ul; j < prodType.size(); ++ j) {
+        const auto &typeIndex = prodType[j];
+        typeInfo[typeIndex].emplace_back(i, j);
+      }
+    }
+
+    // find gap relation and add to gap__, since symmetric,
+    // only half of them permutated
+    for (auto i = 0ul; i < typeSize; ++ i) {
+      for (auto j = i+1; j < typeSize; ++ j) {
+        if (gapMask(i, j)) {
+          const auto &gapSize = gap(i, j);
+          // gapped relation found, add all product of the type
+          // into gap__
+          for (const auto &info1 : typeInfo[i]) {
+            for (const auto &info2 : typeInfo[j]) {
+              gap__.emplace_back(
+                std::array<Integral, 4>({
+                    info1.first, info1.second,
+                    info2.first, info2.second}), gapSize);
+            }
+          }
+        }
+      }
+    }
+  }
+
   Scheduler::OrderWithDep::
   OrderWithDep(Order noDepOrder,
                const RelationOfProducts &relation,
@@ -55,15 +103,15 @@ namespace FactoryWorld {
     }
 
     // load gap
-    for (auto i = 0ul; i < prodType.size(); ++ i) {
-      for (auto j = i+1; j < prodType.size(); ++ j) {
-        // assume gapMask and gap is symmetric
-        const auto &a = prodType[i];
-        const auto &b = prodType[j];
-        if (gapMask(a, b))
-          gap__.emplace_back(i, j, gap(a, b));
-      }
-    }
+    // for (auto i = 0ul; i < prodType.size(); ++ i) {
+    //   for (auto j = i+1; j < prodType.size(); ++ j) {
+    //     // assume gapMask and gap is symmetric
+    //     const auto &a = prodType[i];
+    //     const auto &b = prodType[j];
+    //     if (gapMask(a, b))
+    //       gap__.emplace_back(i, j, gap(a, b));
+    //   }
+    // }
 
     productionTime__.reserve(prodQuan.size());
     // transfrom to production time
@@ -270,6 +318,60 @@ namespace FactoryWorld {
     return constraints;
   }
 
+  // inline std::vector<MPConstraint *> Scheduler::
+  // addConstraints_4(
+  //   const std::vector<std::vector<MPVariable *>> &startTime,
+  //   const Var3D &onMachine,
+  //   MPSolver &solver,
+  //   const std::string &purposeMessage)
+  // {
+  //   std::vector<MPConstraint *> constraints;
+  //   const auto &orders = dataProvier__.getOrders();
+  //   const auto &machines = dataProvier__.getMachines();
+  //   for (auto i = 0ul; i < startTime.size(); ++ i) {
+  //     const auto &currentOrder = orders[i];
+  //     const auto &gap = currentOrder.getGap();
+  //     const auto &currentStart = startTime[i];
+
+  //     // for every gap tuple <p, q, time> add to constraint
+  //     for (const auto &tupleGap : gap) {
+  //       // <p, q, time> is symmetric => <q, p, time>
+  //       // so each of these results in two constraints
+  //       for (auto k = 0ul; k < machines.size(); ++ k) {
+  //         const auto &machine = machines[k];
+  //         const auto p = std::get<0>(tupleGap);
+  //         const auto q = std::get<1>(tupleGap);
+  //         const auto gapTime = std::get<2>(tupleGap);
+  //         // since symmetric, two constraints considered
+
+  //         const auto timeOnMach1 = currentOrder.requiredTime(q, k);
+  //         const auto timeOnMach2 = currentOrder.requiredTime(p, k);
+  //         constraints.emplace_back(
+  //           solver.MakeRowConstraint(-infinity,
+  //             largeNumber - timeOnMach1 - gapTime,
+  //             (purposeMessage +
+  //               "_(" + std::to_string(i) + ", " +
+  //               std::to_string(p) + ", " + std::to_string(q) + ", " +
+  //               std::to_string(k) + ")")));
+  //         constraints.back()->SetCoefficient(currentStart[q], 1.0);
+  //         constraints.back()->SetCoefficient(currentStart[p], -1.0);
+  //         constraints.back()->SetCoefficient(onMachine[i][q][k], largeNumber);
+
+  //         constraints.emplace_back(
+  //           solver.MakeRowConstraint(-infinity,
+  //             largeNumber - timeOnMach2 - gapTime,
+  //             (purposeMessage +
+  //               "_(" + std::to_string(i) + ", " +
+  //               std::to_string(q) + ", " + std::to_string(p) + ", " +
+  //               std::to_string(k) + ")")));
+  //         constraints.back()->SetCoefficient(currentStart[p], 1.0);
+  //         constraints.back()->SetCoefficient(currentStart[q], -1.0);
+  //         constraints.back()->SetCoefficient(onMachine[i][p][k], largeNumber);
+  //       }
+  //     }
+  //   }
+  //   return constraints;
+  // }
   inline std::vector<MPConstraint *> Scheduler::
   addConstraints_4(
     const std::vector<std::vector<MPVariable *>> &startTime,
@@ -277,52 +379,13 @@ namespace FactoryWorld {
     MPSolver &solver,
     const std::string &purposeMessage)
   {
-    std::vector<MPConstraint *> constraints;
-    const auto &orders = dataProvier__.getOrders();
-    const auto &machines = dataProvier__.getMachines();
-    for (auto i = 0ul; i < startTime.size(); ++ i) {
-      const auto &currentOrder = orders[i];
-      const auto &gap = currentOrder.getGapOfProd();
-      const auto &currentStart = startTime[i];
+      std::vector<MPConstraint *> constraints;
+      const auto &orders = dataProvier__.getOrders();
+      const auto &machines = dataProvier__.getMachines();
 
-      // for every gap tuple <p, q, time> add to constraint
-      for (const auto &tupleGap : gap) {
-        // <p, q, time> is symmetric => <q, p, time>
-        // so each of these results in two constraints
-        for (auto k = 0ul; k < machines.size(); ++ k) {
-          const auto &machine = machines[k];
-          const auto p = std::get<0>(tupleGap);
-          const auto q = std::get<1>(tupleGap);
-          const auto gapTime = std::get<2>(tupleGap);
-          // since symmetric, two constraints considered
+      for (const auto &gap : gap__) {
 
-          const auto timeOnMach1 = currentOrder.requiredTime(q, k);
-          const auto timeOnMach2 = currentOrder.requiredTime(p, k);
-          constraints.emplace_back(
-            solver.MakeRowConstraint(-infinity,
-              largeNumber - timeOnMach1 - gapTime,
-              (purposeMessage +
-                "_(" + std::to_string(i) + ", " +
-                std::to_string(p) + ", " + std::to_string(q) + ", " +
-                std::to_string(k) + ")")));
-          constraints.back()->SetCoefficient(currentStart[q], 1.0);
-          constraints.back()->SetCoefficient(currentStart[p], -1.0);
-          constraints.back()->SetCoefficient(onMachine[i][q][k], largeNumber);
-
-          constraints.emplace_back(
-            solver.MakeRowConstraint(-infinity,
-              largeNumber - timeOnMach2 - gapTime,
-              (purposeMessage +
-                "_(" + std::to_string(i) + ", " +
-                std::to_string(q) + ", " + std::to_string(p) + ", " +
-                std::to_string(k) + ")")));
-          constraints.back()->SetCoefficient(currentStart[p], 1.0);
-          constraints.back()->SetCoefficient(currentStart[q], -1.0);
-          constraints.back()->SetCoefficient(onMachine[i][p][k], largeNumber);
-        }
       }
-    }
-    return constraints;
   }
 
   inline std::vector<MPConstraint *> Scheduler::

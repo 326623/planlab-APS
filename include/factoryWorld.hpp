@@ -124,13 +124,15 @@ namespace FactoryWorld {
 
     // the time cost on product transcation on the pipeline
     MatrixTime productTransCost_;
+    Integral typeSize__;
   public:
     explicit RelationOfProducts() {}
     explicit RelationOfProducts(MatrixXd bom, MatrixTime gap) :
       bom_(bom), predecessor_(
         (MatrixXd::Identity(bom.rows(), bom.cols()) - bom_).inverse()),
-      gapProduct_(gap)
+      gapProduct_(gap), typeSize__(bom.rows())
     {
+      CHECK_EQ(bom.rows(), bom.cols()) << "bom matrix not square.";
       // NOTE: might need to consider predecessor.
       // Its floating point is inaccurate
       CHECK((bom_.array() >= 0.0).all()) << "Bom list error! No negative pls.";
@@ -170,6 +172,9 @@ namespace FactoryWorld {
 
     const MatrixTime &getProductTransCost() const
     { return productTransCost_; }
+
+    Integral getTypeSize() const
+    { return typeSize__; }
   };
 
   class Order {
@@ -266,8 +271,8 @@ namespace FactoryWorld {
       // dependency between two products <p, q>, q must be manufactured
       // before p
       std::vector<std::pair<Integral, Integral>> dependency__;
-      std::vector<std::tuple<
-                    Integral, Integral, TimeUnit>> gap__;
+      // std::vector<std::tuple<
+      //               Integral, Integral, TimeUnit>> gap__;
       std::vector<std::vector<TimeUnit>> productionTime__;
 
       inline void productNum2Time(
@@ -291,8 +296,8 @@ namespace FactoryWorld {
       const std::vector<std::pair<Integral, Integral>> &
       getDependency() const { return dependency__; }
 
-      const std::vector<std::tuple<Integral, Integral, TimeUnit>> &
-      getGapOfProd() const { return gap__; }
+      // const std::vector<std::tuple<Integral, Integral, TimeUnit>> &
+      // getGapOfProd() const { return gap__; }
     };
 
     /**
@@ -303,6 +308,26 @@ namespace FactoryWorld {
     private:
       const std::shared_ptr<const Factory> factory__;
       std::vector<OrderWithDep> orders__;
+
+      // a array of size 4, first pair(2 numbers) is a pair (i, j) of
+      // order i product j.
+      // second pair(2 numbers) is another pair (i, j)
+      // (same name, different value)
+      //
+      // the last number is how long they should stay apart in production
+      // to fullfill the constraint that two types of products cannot be
+      // manufactured in the same time period
+
+      // NOTE: this field would not be checked if the there were any duplicate
+      // pair (symmetric pair) for instance <p, q> <q, p> should appear together
+      std::vector<std::pair<
+                    std::array<Integral, 4>,
+                    TimeUnit>> gap__;
+
+      /**
+       * Assume that all the orders are already set up
+       */
+      inline void buildGap();
 
     public:
       // DataProvider() = delete;
@@ -316,6 +341,9 @@ namespace FactoryWorld {
         orders__.reserve(oldOrders.size());
         for (auto i = 0ul; i < oldOrders.size(); ++ i)
           orders__.emplace_back(oldOrders[i], bom, machines);
+
+        // build the gap that will be required by the scheduler
+        buildGap();
       }
 
       const std::vector<OrderWithDep> &getOrders() const
