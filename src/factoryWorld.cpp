@@ -106,10 +106,16 @@ namespace FactoryWorld {
 
     // process BOM
     Eigen::MatrixXd bom(productTypeSize, productTypeSize);
+    Eigen::MatrixXd gap(productTypeSize, productTypeSize);
     for (Integral i = 0; i < productTypeSize; ++ i) {
       processBOM(inputStream, bom, productTypeSize);
     }
-    bom__ = RelationOfProducts(bom);
+
+    for (Integral i = 0; i < productTypeSize; ++ i) {
+      // since these two are basically the same format
+      processBOM(inputStream, gap, productTypeSize);
+    }
+    bom__ = RelationOfProducts(bom, gap);
     LOG(INFO) << productTypeSize << " products added";
 
     // process machines

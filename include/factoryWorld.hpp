@@ -105,6 +105,7 @@ namespace FactoryWorld {
     using MatrixXd = Eigen::MatrixXd;
     using MatrixB = Eigen::Matrix<bool, Eigen::Dynamic,
                                   Eigen::Dynamic, Eigen::RowMajor>;
+    using MatrixTime = Eigen::MatrixXd;
   private:
     // bill of material matrix
     MatrixXd bom_;
@@ -114,22 +115,41 @@ namespace FactoryWorld {
     // a bool matrix to check if a product is directly dependent on another product
     MatrixB directMask_;
     MatrixB inAndDirectMask_;
+
+    // a constraint relation between 2 products
+    // of such product would require some time intervel
+    // in between i.e. gap
+    MatrixTime gapProduct_;
+    MatrixB gapProductMask_;
+
+    // the time cost on product transcation on the pipeline
+    MatrixTime productTransCost_;
   public:
     explicit RelationOfProducts() {}
-    explicit RelationOfProducts(MatrixXd bom) :
+    explicit RelationOfProducts(MatrixXd bom, MatrixTime gap) :
       bom_(bom), predecessor_(
-        (MatrixXd::Identity(bom.rows(), bom.cols()) - bom_).inverse())
+        (MatrixXd::Identity(bom.rows(), bom.cols()) - bom_).inverse()),
+      gapProduct_(gap)
     {
       // NOTE: might need to consider predecessor.
       // Its floating point is inaccurate
       CHECK((bom_.array() >= 0.0).all()) << "Bom list error! No negative pls.";
+      CHECK((gapProduct_.array() >= 0.0).all()) << "Gap list error! No negative pls.";
       // for (auto i = 0ul; i < predecessor_.cols(); ++ i)
       //   for (auto j = 0ul; j < predecessor_.rows(); ++ j)
       //     if (utils::almost_equal(predecessor_(j, i), 0.0))
       //       predecessor_(i, j) = 0.0;
+      assert((gapProduct_.array() >= 0.0).all() && "possibly floating error.");
       assert((predecessor_.array() >= 0.0).all() && "possibly floating error.");
       directMask_ = bom_.array() > 0.0;
       inAndDirectMask_ = predecessor_.array() > 0.0;
+      gapProductMask_ = gapProduct_.array() > 0.0;
+
+      // TODO: not implemented features
+      productTransCost_.setConstant(0.0);
+      LOG(WARNING) << "transcation costs are not loaded into the system yet, "
+                   << "should be implemented in the next iteration, "
+                   << "Now all costs are zero";
     }
 
     const MatrixXd &getBOM() const { return bom_; }
@@ -211,24 +231,51 @@ namespace FactoryWorld {
    */
   class Scheduler {
   private:
-
+    /**
+     * OrderWithDep will extend the the original product list
+     * with dependent product list
+     *
+     * And will add additional data structure to add relation between
+     * the order's products (precedence and gap)
+     */
     class OrderWithDep : public Order {
     private:
-      // computed from bom
-      std::vector<Integral> productQuanDep__;
-      std::vector<Integral> productTypeDep__;
+      // dependency between two products <p, q>, q must be manufactured
+      // before p
+      std::vector<std::pair<Integral, Integral>> dependency__;
+      std::vector<std::tuple<
+                    Integral, Integral, TimeUnit>> gap__;
+      std::vector<std::vector<TimeUnit>> productTime__;
+    public:
+      //explicit OrderWithDep() = delete;
+      explicit OrderWithDep() {}
+      explicit OrderWithDep(Order noDepOrder,
+                            const RelationOfProducts &bom,
+                            const std::vector<Machine> &machines);
+    };
+
+    /**
+     * This class handles the raw data and transform into data type
+     * that can be passed into the scheduler easily
+     */
+    class DataProvider {
+    private:
+      const std::shared_ptr<const Factory> factory__;
+      std::vector<OrderWithDep> orders__;
 
     public:
-      explicit OrderWithDep()
-      { }
-      explicit OrderWithDep(Order noDepOrder,
-                            const RelationOfProducts &bom);
+      // DataProvider() = delete;
+      DataProvider() {}
+      DataProvider(std::shared_ptr<const Factory> factory)
+        : factory__(factory)
+      {
+        const auto &bom = factory__->getBOM();
+        const auto &oldOrders; = factory__->getOrders();
+        orders__.reserve(oldOrders.size());
+        for (auto i = 0ul; i < orders.size(); ++ i)
+          orders.emplace_back(oldOrders[i], bom, machines);
+      }
 
-      const std::vector<Integral> &getProductQuanDep() const
-      { return productQuanDep__; }
-
-      const std::vector<Integral> &getProductTypeDep() const
-      { return productTypeDep__; }
     };
 
     //using namespace operations_research;
@@ -239,10 +286,18 @@ namespace FactoryWorld {
     using Var3D = std::vector<std::vector<std::vector<MPVariable *>>>;
     constexpr static double infinity = std::numeric_limits<double>::infinity();
     constexpr static double largeNumber = std::numeric_limits<double>::max();
+
+    /*
+     * data field used to deal with relationship between products
+     */
     // this variable is computed using orders and machines, and would be extended
     // to include the dependent products
+    //DataProvider data
     std::vector<std::vector<std::vector<TimeUnit>>> productionTime__;
     std::vector<std::vector<bool>> finalProduct__;
+    // all pairs of dependent product
+    std::vector<std::vector<
+                  std::pair<Integral, Integral>>> dependentPair__;
 
     const Factory *factory__;
 

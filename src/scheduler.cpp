@@ -5,33 +5,36 @@
 namespace FactoryWorld {
   Scheduler::OrderWithDep::
   OrderWithDep(Order noDepOrder,
-               const RelationOfProducts &bom)
+               const RelationOfProducts &bom,
+               const std::vector<Machine> &machines)
     : Order(noDepOrder)
   {
-    const auto &inAndDirectMask = bom.getInAndDirectMask();
-    // 1 unit of product i requires how many unit of j => predecessor(i, j)
-    const auto &predecessor = bom.getPredecessor();
+    auto &prodQuan = productQuan_;
+    auto &prodType = productType_;
+    // const auto &inAndDirectMask = bom.getInAndDirectMask();
+    // // 1 unit of product i requires how many unit of j => predecessor(i, j)
+    // const auto &predecessor = bom.getPredecessor();
 
-    // dependent type, excluding themselves
-    const auto dependentMask = inAndDirectMask -
-      MatrixB::Identity(inAndDirectMask.rows(),
-                        inAndDirectMask.cols());
+    // // dependent type, excluding themselves
+    // const auto dependentMask = inAndDirectMask -
+    //   MatrixB::Identity(inAndDirectMask.rows(),
+    //                     inAndDirectMask.cols());
 
-    const auto &finalProdQuan = productQuan_;
-    const auto &finalProdType = productType_;
+    // const auto &finalProdQuan = productQuan_;
+    // const auto &finalProdType = productType_;
 
-    for (auto i = 0ul; i < finalProdQuan.size(); ++ i) {
-      const auto &typeIndex = finalProdType[i];
-      const auto &prodNum = finalProdQuan[i];
-      for (auto j = 0ul; j < dependentMask.cols(); ++ j) {
-        if (dependentMask(typeIndex, j)) {
-          productTypeDep__.emplace_back(j);
-          productQuanDep__.emplace_back(prodNum * predecessor(typeIndex, j));
-          DLOG(INFO) << prodNum << " of " << typeIndex << " relies on "
-                     << prodNum * predecessor(typeIndex, j) << " of " << j;
-        }
-      }
-    }
+    // for (auto i = 0ul; i < finalProdQuan.size(); ++ i) {
+    //   const auto &typeIndex = finalProdType[i];
+    //   const auto &prodNum = finalProdQuan[i];
+    //   for (auto j = 0ul; j < dependentMask.cols(); ++ j) {
+    //     if (dependentMask(typeIndex, j)) {
+    //       productTypeDep__.emplace_back(j);
+    //       productQuanDep__.emplace_back(prodNum * predecessor(typeIndex, j));
+    //       DLOG(INFO) << prodNum << " of " << typeIndex << " relies on "
+    //                  << prodNum * predecessor(typeIndex, j) << " of " << j;
+    //     }
+    //   }
+    // }
   }
 
   /**
@@ -83,7 +86,8 @@ namespace FactoryWorld {
     }
   }
 
-  void Scheduler::computeTimeNeeded() {
+  void Scheduler::computeTimeNeeded()
+  {
     const auto &bom = factory__->getBOM();
     std::vector<OrderWithDep> orders(factory__->getOrders().size());
     std::transform(factory__->getOrders().cbegin(),
@@ -202,14 +206,14 @@ namespace FactoryWorld {
     LOG(INFO) << purposeMessage;
   }
 
-  inline void Scheduler::
-  addConstraints_3(const std::vector<std::vector<MPVariable *>> &startTime,
-                   const std::vector<MPVariable *> &completionTimes,
-                   const Var3D &onMachine, const Factory &factory,
-                   MPSolver &solver, const std::string &purposeMessage)
-  {
+  // inline void Scheduler::
+  // addConstraints_3(const std::vector<std::vector<MPVariable *>> &startTime,
+  //                  const std::vector<MPVariable *> &completionTimes,
+  //                  const Var3D &onMachine, const Factory &factory,
+  //                  MPSolver &solver, const std::string &purposeMessage)
+  // {
 
-  }
+  // }
 
 
   void Scheduler::factoryScheduler(const Factory &factory,
