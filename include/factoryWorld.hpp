@@ -49,6 +49,7 @@ namespace FactoryWorld {
   using Float = double;
   using IndexType = unsigned int;
   using TimeUnit = double;
+  using MatrixTime = Eigen::MatrixXd;
 
   class Machine {
   private:
@@ -105,7 +106,6 @@ namespace FactoryWorld {
     using MatrixXd = Eigen::MatrixXd;
     using MatrixB = Eigen::Matrix<bool, Eigen::Dynamic,
                                   Eigen::Dynamic, Eigen::RowMajor>;
-    using MatrixTime = Eigen::MatrixXd;
   private:
     // bill of material matrix
     MatrixXd bom_;
@@ -153,11 +153,23 @@ namespace FactoryWorld {
     }
 
     const MatrixXd &getBOM() const { return bom_; }
+
     const MatrixXd &getPredecessor() const { return predecessor_; }
+
     const MatrixB &getDirectMask() const
     { return directMask_; }
+
     const MatrixB &getInAndDirectMask() const
     { return inAndDirectMask_; }
+
+    const MatrixTime &getGap() const
+    { return gapProduct_; }
+
+    const MatrixB &getGapMask() const
+    { return gapProductMask_; }
+
+    const MatrixTime &getProductTransCost() const
+    { return productTransCost_; }
   };
 
   class Order {
@@ -231,6 +243,15 @@ namespace FactoryWorld {
    */
   class Scheduler {
   private:
+    //using namespace operations_research;
+    using MatrixB = Eigen::Matrix<bool, Eigen::Dynamic, Eigen::Dynamic>;
+    using MPSolver = operations_research::MPSolver;
+    using MPConstraint = operations_research::MPConstraint;
+    using MPVariable = operations_research::MPVariable;
+    using Var3D = std::vector<std::vector<std::vector<MPVariable *>>>;
+    constexpr static double infinity = std::numeric_limits<double>::infinity();
+    constexpr static double largeNumber = std::numeric_limits<double>::max();
+
     /**
      * OrderWithDep will extend the the original product list
      * with dependent product list
@@ -240,18 +261,38 @@ namespace FactoryWorld {
      */
     class OrderWithDep : public Order {
     private:
+      // end product needed by the client
+      std::vector<bool> endProduct__;
       // dependency between two products <p, q>, q must be manufactured
       // before p
       std::vector<std::pair<Integral, Integral>> dependency__;
       std::vector<std::tuple<
                     Integral, Integral, TimeUnit>> gap__;
-      std::vector<std::vector<TimeUnit>> productTime__;
+      std::vector<std::vector<TimeUnit>> productionTime__;
+
+      inline void productNum2Time(
+        std::vector<std::vector<TimeUnit>> &productionTime,
+        const std::vector<Machine> &machines,
+        const std::vector<Integral> &productQuan,
+        const std::vector<Integral> &productType);
+
     public:
       //explicit OrderWithDep() = delete;
       explicit OrderWithDep() {}
       explicit OrderWithDep(Order noDepOrder,
-                            const RelationOfProducts &bom,
+                            const RelationOfProducts &relation,
                             const std::vector<Machine> &machines);
+      bool finalProd(Integral index) const
+      { return endProduct__[index]; }
+
+      TimeUnit requiredTime(Integral index, Integral machineIndex) const
+      { return productionTime__[index][machineIndex]; }
+
+      const std::vector<std::pair<Integral, Integral>> &
+      getDependency() const { return dependency__; }
+
+      const std::vector<std::tuple<Integral, Integral, TimeUnit>> &
+      getGapOfProd() const { return gap__; }
     };
 
     /**
@@ -270,61 +311,70 @@ namespace FactoryWorld {
         : factory__(factory)
       {
         const auto &bom = factory__->getBOM();
-        const auto &oldOrders; = factory__->getOrders();
+        const auto &oldOrders = factory__->getOrders();
+        const auto &machines = factory__->getMachines();
         orders__.reserve(oldOrders.size());
-        for (auto i = 0ul; i < orders.size(); ++ i)
-          orders.emplace_back(oldOrders[i], bom, machines);
+        for (auto i = 0ul; i < oldOrders.size(); ++ i)
+          orders__.emplace_back(oldOrders[i], bom, machines);
       }
 
-    };
+      const std::vector<OrderWithDep> &getOrders() const
+      { return orders__; }
 
-    //using namespace operations_research;
-    using MatrixB = Eigen::Matrix<bool, Eigen::Dynamic, Eigen::Dynamic>;
-    using MPSolver = operations_research::MPSolver;
-    using MPConstraint = operations_research::MPConstraint;
-    using MPVariable = operations_research::MPVariable;
-    using Var3D = std::vector<std::vector<std::vector<MPVariable *>>>;
-    constexpr static double infinity = std::numeric_limits<double>::infinity();
-    constexpr static double largeNumber = std::numeric_limits<double>::max();
+      const std::vector<Machine> &getMachines() const
+      { return factory__->getMachines(); }
+
+      const MatrixTime &getTransCost() const
+      { return factory__->getBOM().getProductTransCost(); }
+    };
 
     /*
      * data field used to deal with relationship between products
      */
     // this variable is computed using orders and machines, and would be extended
     // to include the dependent products
-    //DataProvider data
-    std::vector<std::vector<std::vector<TimeUnit>>> productionTime__;
-    std::vector<std::vector<bool>> finalProduct__;
-    // all pairs of dependent product
-    std::vector<std::vector<
-                  std::pair<Integral, Integral>>> dependentPair__;
-
+    DataProvider dataProvier__;
     const Factory *factory__;
 
     // used to compute time needed for each order or products on each machine
-    inline void computeTimeNeeded();
+    //inline void computeTimeNeeded();
 
-    template <bool isFinal>
-    inline void productNum2Time(
-      std::vector<std::vector<TimeUnit>> &productionTime,
-      std::vector<bool> &finalProduct,
-      const std::vector<Machine> &machines,
-      const std::vector<Integral> &productQuan,
-      const std::vector<Integral> &productType);
-
-    inline void addConstraints_1(
+    inline std::vector<MPConstraint *> addConstraints_1(
       std::vector<MPVariable *> completionTimes,
       MPVariable const *makeSpan,
-      MPSolver &solver,
-      const std::string &purposeMessage);
+      MPSolver &solver, const std::string &purposeMessage);
 
-    inline void addConstraints_2(
+    inline std::vector<MPConstraint *> addConstraints_2(
       const std::vector<std::vector<MPVariable *>> &startTime,
       const std::vector<MPVariable *> &completionTimes,
       const Var3D &onMachine,
-      const Factory &factory,
-      MPSolver &solver,
-      const std::string &purposeMessage);
+      MPSolver &solver, const std::string &purposeMessage);
+
+    inline std::vector<MPConstraint *> addConstraints_3(
+      const std::vector<std::vector<MPVariable *>> &startTime,
+      const Var3D &onMachine,
+      MPSolver &solver, const std::string &purposeMessage);
+
+    // TODO: reimplementation of constraint 4
+    // gap time should be between all order, among all products
+    inline std::vector<MPConstraint *> addConstraints_4(
+      const std::vector<std::vector<MPVariable *>> &startTime,
+      const Var3D &onMachine,
+      MPSolver &solver, const std::string &purposeMessage);
+
+    inline std::vector<MPConstraint *> addConstraints_5(
+      const std::vector<std::vector<MPVariable *>> &startTime,
+      MPSolver &solver, const std::string &purposeMessage);
+
+    inline std::vector<MPConstraint *> addConstraints_6(
+      const std::vector<std::vector<MPVariable *>> &startTime,
+      const Var3D &onMachine,
+      MPSolver &solver, const std::string &purposeMessage);
+
+    inline std::vector<MPConstraint *> addConstraints_7(
+      const std::vector<std::vector<MPVariable *>> &startTime,
+      const std::vector<Var3D> &immediatePrec,
+      MPSolver &solver, const std::string &purposeMessage);
 
   public:
     explicit Scheduler() {}

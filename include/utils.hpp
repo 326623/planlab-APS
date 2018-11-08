@@ -44,6 +44,13 @@ namespace utils {
       // unless the result is subnormal
       || std::abs(x-y) < std::numeric_limits<T>::min();
   }
+
+  template <typename ForwardIterator, typename BinaryOperation>
+  void permPair(ForwardIterator first, ForwardIterator last, BinaryOperation f) {
+    for (auto iter1 = first; iter1 != last; ++ iter1)
+      for (auto iter2 = iter1+1; iter2 != last; ++ iter2)
+        f(iter1, iter2);
+  }
 }
 
 #endif /* _NEWJOY_UTILS_HPP_ */
