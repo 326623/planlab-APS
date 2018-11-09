@@ -33,8 +33,11 @@ int main(int argc, char **argv) {
   gflags::SetUsageMessage(kUsage);
   gflags::ParseCommandLineFlags(&argc, &argv, true);
   using namespace FactoryWorld;
-  Factory myFactory;
-  myFactory.load(FLAGS_factory_world);
+  std::shared_ptr<Factory> myFactory = std::make_shared<Factory>();
+  myFactory->load(FLAGS_factory_world);
+  Scheduler planner;
+  planner.factoryScheduler(myFactory,
+    operations_research::MPSolver::GLOP_LINEAR_PROGRAMMING);
   // std::cout << myFactory.getBOM().getBOM() << '\n';
 
   // for (const auto &machine : myFactory.getMachines()) {

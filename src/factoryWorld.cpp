@@ -23,7 +23,7 @@ namespace FactoryWorld {
     TimeUnit dueTime;
     Integral clientID;
     for (Integral i = 0; i < typePerOrder; ++ i) {
-      inputStream >> productType[i] >> productQuan[i];
+      inputStream >> productQuan[i] >> productType[i];
       CHECK_GE(productQuan[i], 0);
       CHECK_GE(productType[i], 0);
       CHECK_LT(productType[i], productTypeSize);

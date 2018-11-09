@@ -212,7 +212,7 @@ namespace FactoryWorld {
       const auto &currentOrder = orders[i];
       const auto &productType = currentOrder.getProductType();
 
-      assert(productType.size() == prodStartTime.size());
+      assert(productType.size() == prodStartTimes.size());
       // assume currentOrder.size() == prodStartTime.size()
       // per product of order
       for (auto j = 0ul; j < prodStartTimes.size(); ++ j) {
@@ -388,6 +388,7 @@ namespace FactoryWorld {
         }
       }
     }
+    LOG(INFO) << purposeMessage;
     return constraints;
   }
 
@@ -402,6 +403,7 @@ namespace FactoryWorld {
     const auto &machines = dataProvider__.getMachines();
     std::vector<MPConstraint *> constraints;
 
+    assert(orders.size() == startTime.size());
     for (auto i = 0ul; i < startTime.size(); ++ i) {
       for (auto j = 0ul; j < startTime.size(); ++ j) {
         const auto &order_i = orders[i];
@@ -411,6 +413,8 @@ namespace FactoryWorld {
 
         for (auto p = 0ul; p < startTime[i].size(); ++ p) {
           for (auto q = 0ul; q < startTime[j].size(); ++ q) {
+            assert(startTime[i].size() == orders[i].size());
+            assert(startTime[j].size() == orders[j].size());
             // same product doesn't have restriction
             if (i == j && p == q) continue;
 
@@ -446,6 +450,7 @@ namespace FactoryWorld {
         }
       }
     }
+    LOG(INFO) << purposeMessage;
     return constraints;
   }
 
@@ -503,6 +508,7 @@ namespace FactoryWorld {
         }
       }
     }
+    LOG(INFO) << purposeMessage;
     return constraints;
   }
 
@@ -514,23 +520,29 @@ namespace FactoryWorld {
     const auto &machines = dataProvider__.getMachines();
     const auto &orders = dataProvider__.getOrders();
 
+    assert(onMachine.size() == orders.size());
     for (auto i = 0ul; i < onMachine.size(); ++ i) {
       for (auto p = 0ul; p < onMachine[i].size(); ++ p) {
-        const auto typeIndex = orders[i].getProductType()[p];
+        assert(onMachine[i].size() == orders[i].size());
 
+        const auto typeIndex = orders[i].getProductType()[p];
         constraints.emplace_back(solver.MakeRowConstraint(1, 1,
             (purposeMessage + std::to_string(i) + ", " + std::to_string(p))));
 
         // What would happen if there are no machine capable of manufacturing
         // this type of product
 
+        assert(onMachine[i][p].size() == machines.size());
         for (auto k = 0ul; k < onMachine[i][p].size(); ++ k) {
           const auto &machine = machines[k];
+          std::cout << i << ',' << p << ',' << k << '\n';
           if (machine.capable(typeIndex))
             constraints.back()->SetCoefficient(onMachine[i][p][k], 1);
+
         }
       }
     }
+    LOG(INFO) << purposeMessage;
     return constraints;
   }
 
@@ -686,8 +698,8 @@ namespace FactoryWorld {
     MPSolver &solver, const std::string &purposeMessage) {
     std::vector<MPConstraint *> constraints;
     const auto &orders = dataProvider__.getOrders();
-    assert(completionTimes.size() == tardyTime.size() &&
-           tardyTime.size() == orders.size());
+    assert(completionTimes.size() == earlyTime.size() &&
+           earlyTime.size() == orders.size());
 
     const auto size = completionTimes.size();
     for (auto i = 0ul; i < size; ++ i) {
@@ -786,9 +798,11 @@ namespace FactoryWorld {
     return constraints;
   }
 
-  void Scheduler::factoryScheduler(const Factory &factory,
+  void Scheduler::factoryScheduler(std::shared_ptr<const Factory> factory,
     MPSolver::OptimizationProblemType optimization_problem_type)
   {
+    dataProvider__ = DataProvider{factory};
+    factory__ = factory;
     using namespace operations_research;
     LOG(INFO) << "Building planner";
     MPSolver solver("FactorySolver", optimization_problem_type);
@@ -808,7 +822,7 @@ namespace FactoryWorld {
     MPVariable const *makeSpan = solver.MakeNumVar(0.0, infinity, "MakeSpan");
     std::vector<MPVariable *> completionTimes;
 
-    const auto &orders = factory.getOrders();
+    const auto &orders = factory->getOrders();
     const auto orderSize = orders.size();
     const auto &machines = dataProvider__.getMachines();
     const auto machineSize = machines.size();

@@ -131,7 +131,8 @@ namespace FactoryWorld {
     explicit RelationOfProducts(MatrixXd bom, MatrixTime gap) :
       bom_(bom), predecessor_(
         (MatrixXd::Identity(bom.rows(), bom.cols()) - bom_).inverse()),
-      gapProduct_(gap), typeSize__(bom.rows())
+      gapProduct_(gap), typeSize__(bom.rows()),
+      productTransCost_(bom.rows(), bom.cols())
     {
       CHECK_EQ(bom.rows(), bom.cols()) << "bom matrix not square.";
       // NOTE: might need to consider predecessor.
@@ -315,7 +316,7 @@ namespace FactoryWorld {
      */
     class DataProvider {
     private:
-      const std::shared_ptr<const Factory> factory__;
+      std::shared_ptr<const Factory> factory__;
       std::vector<OrderWithDep> orders__;
 
       // a array of size 4, first pair(2 numbers) is a pair (i, j) of
@@ -340,8 +341,15 @@ namespace FactoryWorld {
 
     public:
       // DataProvider() = delete;
-      DataProvider() {}
-      DataProvider(std::shared_ptr<const Factory> factory);
+      explicit DataProvider() = default; //: factory__(nullptr) {}
+      explicit DataProvider(std::shared_ptr<const Factory> factory);
+
+      DataProvider(const DataProvider &) = default;
+      DataProvider &operator=(const DataProvider&) = default;
+
+      DataProvider(DataProvider &&) = default;
+      DataProvider &operator=(DataProvider &&) = default;
+
       //   : factory__(factory)
       // {
       //   const auto &bom = factory__->getBOM();
@@ -374,7 +382,7 @@ namespace FactoryWorld {
     // this variable is computed using orders and machines, and would be extended
     // to include the dependent products
     DataProvider dataProvider__;
-    const Factory *factory__;
+    std::shared_ptr<const Factory> factory__;
 
     // used to compute time needed for each order or products on each machine
     //inline void computeTimeNeeded();
@@ -468,7 +476,7 @@ namespace FactoryWorld {
   public:
     explicit Scheduler() {}
 
-    void factoryScheduler(const Factory &factory,
+    void factoryScheduler(std::shared_ptr<const Factory> factory,
       MPSolver::OptimizationProblemType optimization_problem_type);
   };
 }
