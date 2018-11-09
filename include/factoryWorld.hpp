@@ -238,6 +238,11 @@ namespace FactoryWorld {
     const std::vector<Machine> &getMachines() const
     { return machines__; }
 
+    Float getTardyCost() const
+    { return tardyCost_; }
+
+    Float getearlyCost() const
+    { return earlyCost_; }
   };
 
   // for debugging
@@ -462,6 +467,7 @@ namespace FactoryWorld {
 
   public:
     explicit Scheduler() {}
+
     void factoryScheduler(const Factory &factory,
       MPSolver::OptimizationProblemType optimization_problem_type);
   };

@@ -111,10 +111,12 @@ namespace FactoryWorld {
       processBOM(inputStream, bom, productTypeSize);
     }
 
-    for (Integral i = 0; i < productTypeSize; ++ i) {
-      // since these two are basically the same format
-      processBOM(inputStream, gap, productTypeSize);
-    }
+    // for (Integral i = 0; i < productTypeSize; ++ i) {
+    //   // since these two are basically the same format
+    //   processBOM(inputStream, gap, productTypeSize);
+    // }
+    gap.setConstant(0.0);
+    LOG(WARNING) << "gap is now unimplemented, all default to 0";
     bom__ = RelationOfProducts(bom, gap);
     LOG(INFO) << productTypeSize << " products added";
 

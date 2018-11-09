@@ -802,15 +802,74 @@ namespace FactoryWorld {
     Var3D onMachine; // bool var
     std::vector<std::vector<Var3D>> immediatePrec; // bool var
     // size == num of machine
-    Var3D dummyPrec;
-    Var3D dummySucc;
+    Var3D dummyPrec; // bool var
+    Var3D dummySucc; // bool var
     std::vector<std::vector<MPVariable *>> startTime;
     MPVariable const *makeSpan = solver.MakeNumVar(0.0, infinity, "MakeSpan");
     std::vector<MPVariable *> completionTimes;
 
-    const auto orderSize = factory.getOrders().size();
+    const auto &orders = factory.getOrders();
+    const auto orderSize = orders.size();
+    const auto &machines = dataProvider__.getMachines();
+    const auto machineSize = machines.size();
+
+    solver.MakeNumVarArray(orderSize, 0.0, infinity, "tardyTime", &tardyTime);
+    solver.MakeNumVarArray(orderSize, 0.0, infinity, "earlyTime", &earlyTime);
+    for (auto i = 0ul; i < orderSize; ++ i)
+      onMachine.emplace_back(orders[i].size(), std::vector<MPVariable *>(machineSize));
+
+    for (auto i = 0ul; i < orderSize; ++ i)
+      for (auto p = 0ul; p < orders[i].size(); ++ p)
+        solver.MakeBoolVarArray(machineSize, "onMachine", &onMachine[i][p]);
+
+    // need refactor
+    immediatePrec.resize(orderSize);
+    for (auto i = 0ul; i < orderSize; ++ i) {
+      immediatePrec[i].resize(orders[i].size());
+      for (auto p = 0ul; p < orders[i].size(); ++ p) {
+        for (auto j = 0ul; j < orderSize; ++ j) {
+          immediatePrec[i][p].emplace_back(
+            orders[j].size(),
+            std::vector<MPVariable *>(machineSize));
+        }
+      }
+    }
+
+    for (auto i = 0ul; i < orderSize; ++ i) {
+      for (auto p = 0ul; p < orders[i].size(); ++ p) {
+        for (auto j = 0ul; j < orderSize; ++ j) {
+          for (auto q = 0ul; q < orders[j].size(); ++ q) {
+            solver.MakeBoolVarArray(machineSize, "immediatePrec",
+              &immediatePrec[i][p][j][q]);
+          }
+        }
+      }
+    }
+
+    for (auto i = 0ul; i < orderSize; ++ i)
+      dummyPrec.emplace_back(orders[i].size(),
+        std::vector<MPVariable *>(machineSize));
+
+    for (auto i = 0ul; i < orderSize; ++ i)
+      for (auto p = 0ul; p < orders[i].size(); ++ p)
+        solver.MakeBoolVarArray(machineSize, "onMachine",
+          &dummyPrec[i][p]);
+
+    for (auto i = 0ul; i < orderSize; ++ i)
+      dummySucc.emplace_back(orders[i].size(),
+        std::vector<MPVariable *>(machineSize));
+
+    for (auto i = 0ul; i < orderSize; ++ i)
+      for (auto p = 0ul; p < orders[i].size(); ++ p)
+        solver.MakeBoolVarArray(machineSize, "onMachine",
+          &dummySucc[i][p]);
+
+    startTime.resize(orderSize);
+    for (auto i = 0ul; i < orderSize; ++ i)
+      solver.MakeNumVarArray(orders[i].size(), 0.0, infinity, "startTime", &startTime[i]);
+
     solver.MakeNumVarArray(orderSize, 0.0, infinity,
-                           "CompletionTime", &completionTimes);
+                           "completionTime", &completionTimes);
 
     // adding constraints
     addConstraints_1(completionTimes, makeSpan, solver,
@@ -860,5 +919,33 @@ namespace FactoryWorld {
 
     addConstraints_17(dummySucc, solver,
       "dummySucc of each line only one predecessor");
+
+    // Objective
+    MPObjective * const objective = solver.MutableObjective();
+    // not implementable given or tool's inability
+    //  objective->SetCoefficient(MakeSpan, machineSize);
+    //   for (auto i = 0ul; i < orderSize; ++ i) {
+    //     for (auto p = 0ul; i < orders[i].size(); ++ i) {
+    //       const auto typeIndex = orders.getProductType()[p];
+    //       for (auto k = 0ul; k < machines.size(); ++ k) {
+    //         const auto &machine = machines[k];
+    //         if (machine.capable(typeIndex)) {
+    //           objective->SetCoefficient()
+    //         }
+    //       }
+    //     }
+    //   }
+    // }
+
+    const auto tardyCost = factory__->getTardyCost();
+    const auto earlyCost = factory__->getearlyCost();
+    for (auto i = 0; i < orderSize; ++ i)
+      objective->SetCoefficient(tardyTime[i], tardyCost);
+
+    for (auto i = 0; i < orderSize; ++ i)
+      objective->SetCoefficient(earlyTime[i], earlyCost);
+
+    objective->SetMinimization();
+    solver.Solve();
   }
 }
