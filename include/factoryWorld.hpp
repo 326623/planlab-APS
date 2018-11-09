@@ -66,6 +66,7 @@ namespace FactoryWorld {
       capableProduct_(capability.size()), capability_(capability),
       readyTime_(readyTime)
     {
+      CHECK_GE(readyTime_, 0.0) << "negative readyTime";
       // all capability should be above or equal to zero
       for (const auto & cap : capability_)
         CHECK_GE(cap, 0.0);
@@ -206,6 +207,9 @@ namespace FactoryWorld {
     Integral getClientID() const { return clientID_; }
 
     Integral getMaterialDate() const { return materialDate_; }
+
+    std::size_t size() const
+    { return productType_.size(); }
   };
 
 
@@ -332,19 +336,19 @@ namespace FactoryWorld {
     public:
       // DataProvider() = delete;
       DataProvider() {}
-      DataProvider(std::shared_ptr<const Factory> factory)
-        : factory__(factory)
-      {
-        const auto &bom = factory__->getBOM();
-        const auto &oldOrders = factory__->getOrders();
-        const auto &machines = factory__->getMachines();
-        orders__.reserve(oldOrders.size());
-        for (auto i = 0ul; i < oldOrders.size(); ++ i)
-          orders__.emplace_back(oldOrders[i], bom, machines);
+      DataProvider(std::shared_ptr<const Factory> factory);
+      //   : factory__(factory)
+      // {
+      //   const auto &bom = factory__->getBOM();
+      //   const auto &oldOrders = factory__->getOrders();
+      //   const auto &machines = factory__->getMachines();
+      //   orders__.reserve(oldOrders.size());
+      //   for (auto i = 0ul; i < oldOrders.size(); ++ i)
+      //     orders__.emplace_back(oldOrders[i], bom, machines);
 
-        // build the gap that will be required by the scheduler
-        buildGap();
-      }
+      //   // build the gap that will be required by the scheduler
+      //   buildGap();
+      // }
 
       const std::vector<OrderWithDep> &getOrders() const
       { return orders__; }
@@ -354,6 +358,9 @@ namespace FactoryWorld {
 
       const MatrixTime &getTransCost() const
       { return factory__->getBOM().getProductTransCost(); }
+
+      const std::vector<std::pair<std::array<Integral, 4>, TimeUnit>> &getGap()
+      { return gap__; }
     };
 
     /*
@@ -361,7 +368,7 @@ namespace FactoryWorld {
      */
     // this variable is computed using orders and machines, and would be extended
     // to include the dependent products
-    DataProvider dataProvier__;
+    DataProvider dataProvider__;
     const Factory *factory__;
 
     // used to compute time needed for each order or products on each machine
@@ -401,7 +408,56 @@ namespace FactoryWorld {
 
     inline std::vector<MPConstraint *> addConstraints_7(
       const std::vector<std::vector<MPVariable *>> &startTime,
-      const std::vector<Var3D> &immediatePrec,
+      const std::vector<std::vector<Var3D>> &immediatePrec,
+      MPSolver &solver, const std::string &purposeMessage);
+
+    inline std::vector<MPConstraint *> addConstraints_8(
+      const Var3D &onMachine,
+      const std::vector<std::vector<Var3D>> &immediatePrec,
+      MPSolver &solver, const std::string &purposeMessage);
+
+    inline std::vector<MPConstraint *> addConstraints_9(
+      const Var3D &onMachine,
+      MPSolver &solver, const std::string &purposeMessage);
+
+    inline std::vector<MPConstraint *> addConstraints_10(
+      const Var3D &onMachine,
+      MPSolver &solver, const std::string &purposeMessage);
+
+    inline std::vector<MPConstraint *> addConstraints_11(
+      const std::vector<std::vector<Var3D>> &immediatePrec,
+      const Var3D &dummyPrec,
+      const Var3D &dummySucc,
+      MPSolver &solver, const std::string &purposeMessage);
+
+    inline std::vector<MPConstraint *> addConstraints_12(
+      const std::vector<MPVariable *> &completionTimes,
+      const std::vector<MPVariable *> &tardyTime,
+      MPSolver &solver, const std::string &purposeMessage);
+
+    inline std::vector<MPConstraint *> addConstraints_13(
+      const std::vector<MPVariable *> &completionTimes,
+      const std::vector<MPVariable *> &earlyTime,
+      MPSolver &solver, const std::string &purposeMessage);
+
+    inline std::vector<MPConstraint *>
+    addConstraints_14(
+      const std::vector<MPVariable *> &tardyTime,
+      MPSolver &solver, const std::string &purposeMessage);
+
+    inline std::vector<MPConstraint *>
+    addConstraints_15(
+      const std::vector<MPVariable *> &earlyTime,
+      MPSolver &solver, const std::string &purposeMessage);
+
+    inline std::vector<MPConstraint *>
+    addConstraints_16(
+      const Var3D &dummyPrec,
+      MPSolver &solver, const std::string &purposeMessage);
+
+    inline std::vector<MPConstraint *>
+    addConstraints_17(
+      const Var3D &dummySucc,
       MPSolver &solver, const std::string &purposeMessage);
 
   public:
