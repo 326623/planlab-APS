@@ -2,16 +2,17 @@ cmake_minimum_required(VERSION 3.8.2)
 project( planlab_ASP VERSION 0.1 )
 find_package( Eigen3 3.3 REQUIRED NO_MODULE)
 
-if(MSVC)
-  #add_compile_options(/W3 /WX)
-else()
-  #add_compile_options(-W -Wall)
-  #add_compile_options(-W -Wall)
-endif()
-
 set(CMAKE_CXX_STANDARD 11)
 # dependency
 add_subdirectory( deps/or-tools )
+
+if(MSVC)
+  add_compile_options(/W3 /WX)
+else()
+  #add_compile_options(-W -Wall)
+  add_compile_options(-W -Wall)
+  set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -ggdb -O0")
+endif()
 
 LIST(APPEND SOURCES
   src/factoryWorld.cpp

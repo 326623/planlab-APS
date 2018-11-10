@@ -161,7 +161,7 @@ namespace FactoryWorld {
       // per machine
       for (auto k = 0ul; k < machines.size(); ++ k) {
         const auto &machine = machines[k];
-        if (machine.capable(typeIndex)) {
+        if (!machine.capable(typeIndex)) {
           currentProduct[k] = infinity;
         }
         else {
@@ -291,46 +291,48 @@ namespace FactoryWorld {
     const std::vector<std::vector<MPVariable *>> &startTime,
     const Var3D &onMachine,
     MPSolver &solver,
-    const std::string &purposeMessage)
-  {
-      std::vector<MPConstraint *> constraints;
-      const auto &orders = dataProvider__.getOrders();
-      const auto &machines = dataProvider__.getMachines();
-      const auto &dataGap = dataProvider__.getGap();
+    const std::string &purposeMessage) {
 
-      for (const auto &gap : dataGap) {
-        for (auto k = 0ul; k < machines.size(); ++ k) {
-          const auto &gapArray = gap.first;
-          const auto &gapTime = gap.second;
-          //Integral i, p, j, q = , gapArray[1], gapArray[2], gapArray[3];
-          auto i = gapArray[0], p = gapArray[1], j = gapArray[2], q = gapArray[3];
-          // product p of order i
-          const auto &timeOnMach1 = orders[i].requiredTime(p, k);
-          // product q of order j
-          const auto &timeOnMach2 = orders[j].requiredTime(q, k);
+    std::vector<MPConstraint *> constraints;
+    const auto &orders = dataProvider__.getOrders();
+    const auto &machines = dataProvider__.getMachines();
+    const auto &dataGap = dataProvider__.getGap();
 
-          // symmetric constraints
-          constraints.emplace_back(
-            solver.MakeRowConstraint(-infinity,
-              largeNumber - timeOnMach1 - gapTime,
-              (purposeMessage + "_(" + std::to_string(i) + ", " +
-                std::to_string(p) + ", " + std::to_string(j) + ", " +
-                std::to_string(q) + ")")));
-          constraints.back()->SetCoefficient(startTime[i][p], 1.0);
-          constraints.back()->SetCoefficient(startTime[j][q], -1.0);
-          constraints.back()->SetCoefficient(onMachine[i][p][k], largeNumber);
+    for (const auto &gap : dataGap) {
+      for (auto k = 0ul; k < machines.size(); ++ k) {
+        const auto &gapArray = gap.first;
+        const auto &gapTime = gap.second;
+        //Integral i, p, j, q = , gapArray[1], gapArray[2], gapArray[3];
+        auto i = gapArray[0], p = gapArray[1], j = gapArray[2], q = gapArray[3];
+        // product p of order i
+        const auto &timeOnMach1 = orders[i].requiredTime(p, k);
+        // product q of order j
+        const auto &timeOnMach2 = orders[j].requiredTime(q, k);
 
-          constraints.emplace_back(
-            solver.MakeRowConstraint(-infinity,
-              largeNumber - timeOnMach2 - gapTime,
-              (purposeMessage + "_(" + std::to_string(j) + ", " +
-                std::to_string(q) + ", " + std::to_string(i) + ", " +
-                std::to_string(p) + ")")));
-          constraints.back()->SetCoefficient(startTime[j][q], 1.0);
-          constraints.back()->SetCoefficient(startTime[i][p], -1.0);
-          constraints.back()->SetCoefficient(onMachine[j][q][k], largeNumber);
-        }
+        // symmetric constraints
+        constraints.emplace_back(
+          solver.MakeRowConstraint(-infinity,
+            largeNumber - timeOnMach1 - gapTime,
+            (purposeMessage + "_(" + std::to_string(i) + ", " +
+              std::to_string(p) + ", " + std::to_string(j) + ", " +
+              std::to_string(q) + ")")));
+        constraints.back()->SetCoefficient(startTime[i][p], 1.0);
+        constraints.back()->SetCoefficient(startTime[j][q], -1.0);
+        constraints.back()->SetCoefficient(onMachine[i][p][k], largeNumber);
+
+        constraints.emplace_back(
+          solver.MakeRowConstraint(-infinity,
+            largeNumber - timeOnMach2 - gapTime,
+            (purposeMessage + "_(" + std::to_string(j) + ", " +
+              std::to_string(q) + ", " + std::to_string(i) + ", " +
+              std::to_string(p) + ")")));
+        constraints.back()->SetCoefficient(startTime[j][q], 1.0);
+        constraints.back()->SetCoefficient(startTime[i][p], -1.0);
+        constraints.back()->SetCoefficient(onMachine[j][q][k], largeNumber);
       }
+    }
+    LOG(INFO) << purposeMessage;
+    return constraints;
   }
 
   inline std::vector<MPConstraint *> Scheduler::
@@ -346,7 +348,7 @@ namespace FactoryWorld {
       const auto &currentStart = startTime[i];
       const auto &currentOrder = orders[i];
       // TODO: material to TimeUnit
-      const auto &rawMaterial = currentOrder.getMaterialDate();
+      const auto rawMaterial = currentOrder.getMaterialDate();
       // for every product, it should wait until raw material to arrive
       for (auto j = 0ul; j < currentStart.size(); ++ j) {
         constraints.emplace_back(
@@ -356,6 +358,7 @@ namespace FactoryWorld {
         constraints.back()->SetCoefficient(currentStart[j], 1.0);
       }
     }
+    LOG(INFO) << purposeMessage;
     return constraints;
   }
 
@@ -535,7 +538,6 @@ namespace FactoryWorld {
         assert(onMachine[i][p].size() == machines.size());
         for (auto k = 0ul; k < onMachine[i][p].size(); ++ k) {
           const auto &machine = machines[k];
-          std::cout << i << ',' << p << ',' << k << '\n';
           if (machine.capable(typeIndex))
             constraints.back()->SetCoefficient(onMachine[i][p][k], 1);
 
@@ -680,6 +682,7 @@ namespace FactoryWorld {
     const auto size = completionTimes.size();
     for (auto i = 0ul; i < size; ++ i) {
       const auto dueTime = orders[i].getDueTime();
+      std::cout << dueTime << '\n';
       constraints.emplace_back(
         solver.MakeRowConstraint(-infinity,
           dueTime, (purposeMessage + "i")));
@@ -801,7 +804,7 @@ namespace FactoryWorld {
   void Scheduler::factoryScheduler(std::shared_ptr<const Factory> factory,
     MPSolver::OptimizationProblemType optimization_problem_type)
   {
-    dataProvider__ = DataProvider{factory};
+    dataProvider__ = DataProvider(factory);
     factory__ = factory;
     using namespace operations_research;
     LOG(INFO) << "Building planner";
@@ -830,8 +833,13 @@ namespace FactoryWorld {
     solver.MakeNumVarArray(orderSize, 0.0, infinity, "tardyTime", &tardyTime);
     solver.MakeNumVarArray(orderSize, 0.0, infinity, "earlyTime", &earlyTime);
     for (auto i = 0ul; i < orderSize; ++ i)
-      onMachine.emplace_back(orders[i].size(), std::vector<MPVariable *>(machineSize));
+      onMachine.emplace_back(orders[i].size(), std::vector<MPVariable *>(0));
 
+    /**
+     * OR TOOLS implementation detail reveals that it's pushing back into vector
+     * without before hand clearing the vector, probably because
+     * a single variable can contain multiple MakeNumVarArray's initialization
+     */
     for (auto i = 0ul; i < orderSize; ++ i)
       for (auto p = 0ul; p < orders[i].size(); ++ p)
         solver.MakeBoolVarArray(machineSize, "onMachine", &onMachine[i][p]);
@@ -844,7 +852,7 @@ namespace FactoryWorld {
         for (auto j = 0ul; j < orderSize; ++ j) {
           immediatePrec[i][p].emplace_back(
             orders[j].size(),
-            std::vector<MPVariable *>(machineSize));
+            std::vector<MPVariable *>(0));
         }
       }
     }
@@ -862,7 +870,7 @@ namespace FactoryWorld {
 
     for (auto i = 0ul; i < orderSize; ++ i)
       dummyPrec.emplace_back(orders[i].size(),
-        std::vector<MPVariable *>(machineSize));
+        std::vector<MPVariable *>(0));
 
     for (auto i = 0ul; i < orderSize; ++ i)
       for (auto p = 0ul; p < orders[i].size(); ++ p)
@@ -871,7 +879,7 @@ namespace FactoryWorld {
 
     for (auto i = 0ul; i < orderSize; ++ i)
       dummySucc.emplace_back(orders[i].size(),
-        std::vector<MPVariable *>(machineSize));
+        std::vector<MPVariable *>(0));
 
     for (auto i = 0ul; i < orderSize; ++ i)
       for (auto p = 0ul; p < orders[i].size(); ++ p)

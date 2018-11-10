@@ -183,7 +183,7 @@ namespace FactoryWorld {
   protected:
     std::vector<Integral> productQuan_;
     std::vector<Integral> productType_;
-    Float dueTime_;
+    TimeUnit dueTime_;
     Integral clientID_;
     Integral materialDate_; // raw material time
   public:
@@ -203,7 +203,7 @@ namespace FactoryWorld {
     const std::vector<Integral> &
     getProductType() const { return productType_; }
 
-    Float getDueTime() const { return dueTime_; }
+    TimeUnit getDueTime() const { return dueTime_; }
 
     Integral getClientID() const { return clientID_; }
 
