@@ -4,6 +4,12 @@
 #include <queue>
 
 namespace FactoryWorld {
+  template <typename ... IndexTypes>
+  std::string makeName(std::string prefix, IndexTypes ... nums) {
+    if (sizeof...(nums)) return prefix + '_' + utils::numToBracket(nums...) + '_';
+    else return prefix;
+  }
+
   using MPConstraint = operations_research::MPConstraint;
 
   Scheduler::DataProvider::DataProvider(std::shared_ptr<const Factory> factory)
@@ -181,7 +187,7 @@ namespace FactoryWorld {
     for (auto i = 0ul; i < completionTimes.size(); ++ i) {
       constraints.emplace_back(
         solver.MakeRowConstraint(
-          -infinity, 0.0, purposeMessage + "_" + std::to_string(i)));
+          -infinity, 0.0, makeName(purposeMessage, i)));
     }
 
     for (auto i = 0ul; i < constraints.size(); ++ i) {
@@ -234,8 +240,7 @@ namespace FactoryWorld {
               solver.MakeRowConstraint(-infinity,
                 largeNumber - timesOnMach,
                 // TODO: How to make this mess into a templated or macro
-                purposeMessage + "_(" + std::to_string(i) + ", " +
-                std::to_string(j) + ", " + std::to_string(k) + ")"));
+                makeName(purposeMessage, i, j, k)));
             constraints.back()->SetCoefficient(prodStart, 1.0);
             constraints.back()->SetCoefficient(completionTimes[i], -1.0);
             constraints.back()->SetCoefficient(onMachine[i][j][k], largeNumber);
@@ -272,10 +277,7 @@ namespace FactoryWorld {
           constraints.emplace_back(
             solver.MakeRowConstraint(-infinity,
               largeNumber - timeOnMach,
-              (purposeMessage +
-                "_(" + std::to_string(i) + ", " +
-                std::to_string(p) + ", " + std::to_string(q) + ", " +
-                std::to_string(k) + ")")));
+              makeName(purposeMessage, i, p, q, k)));
           constraints.back()->SetCoefficient(currentStart[q], 1.0);
           constraints.back()->SetCoefficient(currentStart[p], -1.0);
           constraints.back()->SetCoefficient(onMachine[i][q][k], largeNumber);
@@ -313,9 +315,7 @@ namespace FactoryWorld {
         constraints.emplace_back(
           solver.MakeRowConstraint(-infinity,
             largeNumber - timeOnMach1 - gapTime,
-            (purposeMessage + "_(" + std::to_string(i) + ", " +
-              std::to_string(p) + ", " + std::to_string(j) + ", " +
-              std::to_string(q) + ")")));
+            makeName(purposeMessage, i, p, j, q, k)));
         constraints.back()->SetCoefficient(startTime[i][p], 1.0);
         constraints.back()->SetCoefficient(startTime[j][q], -1.0);
         constraints.back()->SetCoefficient(onMachine[i][p][k], largeNumber);
@@ -323,9 +323,7 @@ namespace FactoryWorld {
         constraints.emplace_back(
           solver.MakeRowConstraint(-infinity,
             largeNumber - timeOnMach2 - gapTime,
-            (purposeMessage + "_(" + std::to_string(j) + ", " +
-              std::to_string(q) + ", " + std::to_string(i) + ", " +
-              std::to_string(p) + ")")));
+            makeName(purposeMessage, j, q, i, p, k)));
         constraints.back()->SetCoefficient(startTime[j][q], 1.0);
         constraints.back()->SetCoefficient(startTime[i][p], -1.0);
         constraints.back()->SetCoefficient(onMachine[j][q][k], largeNumber);
@@ -353,8 +351,7 @@ namespace FactoryWorld {
       for (auto j = 0ul; j < currentStart.size(); ++ j) {
         constraints.emplace_back(
           solver.MakeRowConstraint(rawMaterial, infinity,
-            (purposeMessage + "_(" + std::to_string(i) + ", " +
-              std::to_string(j) + ")")));
+            makeName(purposeMessage, i, j)));
         constraints.back()->SetCoefficient(currentStart[j], 1.0);
       }
     }
@@ -384,8 +381,7 @@ namespace FactoryWorld {
           constraints.emplace_back(
             solver.MakeRowConstraint(
               ready - largeNumber,
-              infinity, (purposeMessage + "_(" + std::to_string(i) +
-                ", " + std::to_string(j) + ", " + std::to_string(k) + ")")));
+              infinity, makeName(purposeMessage, i, j, k)));
           constraints.back()->SetCoefficient(currentStart[j], 1.0);
           constraints.back()->SetCoefficient(onMachine[i][j][k], -largeNumber);
         }
@@ -441,9 +437,7 @@ namespace FactoryWorld {
               constraints.emplace_back(
                 solver.MakeRowConstraint(-infinity,
                   largeNumber - order_i.requiredTime(p, k),
-                  (purposeMessage + std::to_string(i) + std::to_string(p) +
-                    std::to_string(j) + std::to_string(q) +
-                    std::to_string(k))));
+                  makeName(purposeMessage, i, p, j, q, k)));
               constraints.back()->SetCoefficient(startTime[i][p], 1.0);
               constraints.back()->SetCoefficient(immediate, p2qTransCost);
               constraints.back()->SetCoefficient(immediate, largeNumber);
@@ -499,9 +493,7 @@ namespace FactoryWorld {
               const auto &immediate_pq = immediatePrec[i][p][j][q][k];
               constraints.emplace_back(
                 solver.MakeRowConstraint(-infinity, 0,
-                  (purposeMessage + std::to_string(i) + std::to_string(p) +
-                    std::to_string(j) + std::to_string(q) +
-                    std::to_string(k))));
+                  makeName(purposeMessage, i, p, j, q, k)));
               constraints.back()->SetCoefficient(immediate_qp, 2.0);
               constraints.back()->SetCoefficient(immediate_pq, 2.0);
               constraints.back()->SetCoefficient(pOnMachine[k], -1.0);
@@ -530,7 +522,7 @@ namespace FactoryWorld {
 
         const auto typeIndex = orders[i].getProductType()[p];
         constraints.emplace_back(solver.MakeRowConstraint(1, 1,
-            (purposeMessage + std::to_string(i) + ", " + std::to_string(p))));
+            makeName(purposeMessage, i, p)));
 
         // What would happen if there are no machine capable of manufacturing
         // this type of product
@@ -563,7 +555,7 @@ namespace FactoryWorld {
           // add constraint
           if (!machines[k].capable(p)) {
             constraints.emplace_back(solver.MakeRowConstraint(0, 0,
-                (purposeMessage + std::to_string(i) + ", " + std::to_string(p))));
+                makeName(purposeMessage, i, p, k)));
             constraints.back()->SetCoefficient(onMachine[i][p][k], 1.0);
           }
         }
@@ -588,7 +580,7 @@ namespace FactoryWorld {
       for (auto p = 0ul; p < orders[i].size(); ++ p) {
         constraintsPrec[i].emplace_back(
           solver.MakeRowConstraint(1, 1,
-            (purposeMessage + std::to_string(i) + ", " + std::to_string(p) + " Prec")));
+            makeName(purposeMessage, i, p) + "_Prec"));
       }
     }
 
@@ -623,7 +615,7 @@ namespace FactoryWorld {
       for (auto p = 0ul; p < orders[i].size(); ++ p) {
         constraintsSucc[i].emplace_back(
           solver.MakeRowConstraint(1, 1,
-            (purposeMessage + std::to_string(i) + ", " + std::to_string(p) + " Succ")));
+            makeName(purposeMessage, i, p) + "_Succ"));
       }
     }
 
@@ -665,6 +657,7 @@ namespace FactoryWorld {
     //     }
     // }
 
+    LOG(INFO) << purposeMessage;
     LOG(WARNING) << "return null constraint for now.";
     return std::vector<MPConstraint *>();
   }
@@ -682,15 +675,15 @@ namespace FactoryWorld {
     const auto size = completionTimes.size();
     for (auto i = 0ul; i < size; ++ i) {
       const auto dueTime = orders[i].getDueTime();
-      std::cout << dueTime << '\n';
       constraints.emplace_back(
         solver.MakeRowConstraint(-infinity,
-          dueTime, (purposeMessage + "i")));
+          dueTime, makeName(purposeMessage, i)));
 
       constraints.back()->SetCoefficient(completionTimes[i], 1.0);
       constraints.back()->SetCoefficient(tardyTime[i], -1.0);
     }
 
+    LOG(INFO) << purposeMessage;
     return constraints;
   }
 
@@ -709,11 +702,12 @@ namespace FactoryWorld {
       const auto dueTime = orders[i].getDueTime();
       constraints.emplace_back(
         solver.MakeRowConstraint(
-          dueTime, infinity, (purposeMessage + std::to_string(i))));
+          dueTime, infinity, makeName(purposeMessage, i)));
       constraints.back()->SetCoefficient(completionTimes[i], 1.0);
       constraints.back()->SetCoefficient(earlyTime[i], 1.0);
     }
 
+    LOG(INFO) << purposeMessage;
     return constraints;
   }
 
@@ -726,9 +720,11 @@ namespace FactoryWorld {
     for (auto i = 0ul; i < size; ++ i) {
       constraints.emplace_back(
         solver.MakeRowConstraint(
-          0, infinity, (purposeMessage + std::to_string(i))));
+          0, infinity, makeName(purposeMessage, i)));
       constraints.back()->SetCoefficient(tardyTime[i], 1.0);
     }
+
+    LOG(INFO) << purposeMessage;
     return constraints;
   }
 
@@ -741,9 +737,10 @@ namespace FactoryWorld {
     for (auto i = 0ul; i < size; ++ i) {
       constraints.emplace_back(
         solver.MakeRowConstraint(
-          0, infinity, (purposeMessage + std::to_string(i))));
+          0, infinity, makeName(purposeMessage, i)));
       constraints.back()->SetCoefficient(earlyTime[i], 1.0);
     }
+    LOG(INFO) << purposeMessage;
     return constraints;
   }
 
@@ -761,7 +758,7 @@ namespace FactoryWorld {
       // product p will be the first to produce on line k
       constraints.emplace_back(
         solver.MakeRowConstraint(1, 1,
-          (purposeMessage + std::to_string(k))));
+          makeName(purposeMessage, k)));
       for (auto i = 0ul; i < sizeOrder; ++ i) {
         const auto sizeProduct = dummyPrec[i].size();
         for (auto p = 0ul; p < sizeProduct; ++ p) {
@@ -771,6 +768,7 @@ namespace FactoryWorld {
         }
       }
     }
+    LOG(INFO) << purposeMessage;
     return constraints;
   }
 
@@ -788,7 +786,7 @@ namespace FactoryWorld {
       // product p will be the first to produce on line k
       constraints.emplace_back(
         solver.MakeRowConstraint(1, 1,
-          (purposeMessage + std::to_string(k))));
+          makeName(purposeMessage, k)));
       for (auto i = 0ul; i < sizeOrder; ++ i) {
         const auto sizeProduct = dummySucc[i].size();
         for (auto p = 0ul; p < sizeProduct; ++ p) {
@@ -798,6 +796,7 @@ namespace FactoryWorld {
         }
       }
     }
+    LOG(INFO) << purposeMessage;
     return constraints;
   }
 
@@ -842,7 +841,7 @@ namespace FactoryWorld {
      */
     for (auto i = 0ul; i < orderSize; ++ i)
       for (auto p = 0ul; p < orders[i].size(); ++ p)
-        solver.MakeBoolVarArray(machineSize, "onMachine", &onMachine[i][p]);
+        solver.MakeBoolVarArray(machineSize, makeName("onMachine", i, p), &onMachine[i][p]);
 
     // need refactor
     immediatePrec.resize(orderSize);
@@ -861,7 +860,8 @@ namespace FactoryWorld {
       for (auto p = 0ul; p < orders[i].size(); ++ p) {
         for (auto j = 0ul; j < orderSize; ++ j) {
           for (auto q = 0ul; q < orders[j].size(); ++ q) {
-            solver.MakeBoolVarArray(machineSize, "immediatePrec",
+            solver.MakeBoolVarArray(machineSize,
+              makeName("immediatePrec", i, p, j, q),
               &immediatePrec[i][p][j][q]);
           }
         }
@@ -874,7 +874,8 @@ namespace FactoryWorld {
 
     for (auto i = 0ul; i < orderSize; ++ i)
       for (auto p = 0ul; p < orders[i].size(); ++ p)
-        solver.MakeBoolVarArray(machineSize, "onMachine",
+        solver.MakeBoolVarArray(machineSize,
+          makeName("dummyPrec", i, p),
           &dummyPrec[i][p]);
 
     for (auto i = 0ul; i < orderSize; ++ i)
@@ -883,15 +884,17 @@ namespace FactoryWorld {
 
     for (auto i = 0ul; i < orderSize; ++ i)
       for (auto p = 0ul; p < orders[i].size(); ++ p)
-        solver.MakeBoolVarArray(machineSize, "onMachine",
+        solver.MakeBoolVarArray(machineSize,
+          makeName("dummySucc", i, p),
           &dummySucc[i][p]);
 
     startTime.resize(orderSize);
     for (auto i = 0ul; i < orderSize; ++ i)
-      solver.MakeNumVarArray(orders[i].size(), 0.0, infinity, "startTime", &startTime[i]);
+      solver.MakeNumVarArray(orders[i].size(), 0.0, infinity,
+        makeName("startTime", i), &startTime[i]);
 
     solver.MakeNumVarArray(orderSize, 0.0, infinity,
-                           "completionTime", &completionTimes);
+      makeName("completionTime"), &completionTimes);
 
     // adding constraints
     addConstraints_1(completionTimes, makeSpan, solver,
@@ -959,6 +962,14 @@ namespace FactoryWorld {
     //   }
     // }
 
+    for (const auto & var: solver.variables()) {
+      DLOG(INFO) << var->name() << '\n';
+    }
+
+    for (const auto &constraint : solver.constraints()) {
+      DLOG(INFO) << constraint->name() << '\n';
+    }
+
     const auto tardyCost = factory__->getTardyCost();
     const auto earlyCost = factory__->getearlyCost();
     for (auto i = 0; i < orderSize; ++ i)
@@ -969,5 +980,6 @@ namespace FactoryWorld {
 
     objective->SetMinimization();
     solver.Solve();
+    std::cout << objective->Value() << '\n';
   }
 }

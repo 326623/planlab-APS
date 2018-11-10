@@ -192,8 +192,11 @@ namespace FactoryWorld {
                    std::vector<Integral> productType,
                    Float dueTime, Integral clientID, Integral materialDate)
       : productQuan_(productQuan), productType_(productType),
-        dueTime_(dueTime), clientID_(clientID), materialDate_(materialDate)
-    { CHECK_EQ(productQuan.size(), productType.size()); }
+        dueTime_(dueTime), clientID_(clientID),
+        materialDate_(materialDate)
+    {
+      CHECK_EQ(productQuan.size(), productType.size());
+    }
 
     explicit Order(std::ifstream &);
 

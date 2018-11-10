@@ -10,6 +10,8 @@ namespace FactoryWorld {
   template <typename InputStream>
   inline Order processOrder(InputStream &inputStream,
                             Integral productTypeSize) {
+    LOG(WARNING)
+      << "Now day -> hours is multipy by 10, assmuing 10 hours per day";
     // how many end products per order
     Integral typePerOrder;
     inputStream >> typePerOrder;
@@ -31,7 +33,7 @@ namespace FactoryWorld {
 
     inputStream >> materialDate >> dueTime >> clientID;
     return Order(std::move(productQuan), std::move(productType),
-                 dueTime, clientID, materialDate);
+                 dueTime * 10, clientID, materialDate * 10);
   }
 
   /*

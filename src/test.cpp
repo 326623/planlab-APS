@@ -36,6 +36,8 @@ int main(int argc, char **argv) {
   std::shared_ptr<Factory> myFactory = std::make_shared<Factory>();
   myFactory->load(FLAGS_factory_world);
   Scheduler planner;
+  // planner.factoryScheduler(myFactory,
+  //   operations_research::MPSolver::CBC_MIXED_INTEGER_PROGRAMMING);//GLOP_LINEAR_PROGRAMMING);
   planner.factoryScheduler(myFactory,
     operations_research::MPSolver::GLOP_LINEAR_PROGRAMMING);
   // std::cout << myFactory.getBOM().getBOM() << '\n';

@@ -51,6 +51,25 @@ namespace utils {
       for (auto iter2 = iter1+1; iter2 != last; ++ iter2)
         f(iter1, iter2);
   }
+
+  template <typename ... Args>
+  std::string numPacking() {
+    return "";
+  }
+
+  template <typename IndexType, typename ... Args>
+  std::string numPacking(IndexType head, Args ... tail) {
+    if (sizeof...(tail))
+      return std::to_string(head) + ',' + numPacking(tail...);
+    else
+      return std::to_string(head);
+  }
+
+  template <typename ... IndexTypes>
+  std::string numToBracket(IndexTypes ... indices) {
+    return '[' + numPacking(indices...) + ']';
+  }
+
 }
 
 #endif /* _NEWJOY_UTILS_HPP_ */
