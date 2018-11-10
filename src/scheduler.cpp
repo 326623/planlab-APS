@@ -195,7 +195,8 @@ namespace FactoryWorld {
       constraints[i]->SetCoefficient(makeSpan, -1.0);
     }
 
-    LOG(INFO) << purposeMessage;
+    LOG(INFO) << purposeMessage << " added number of constraints "
+              << constraints.size();
     return constraints;
   }
 
@@ -208,7 +209,7 @@ namespace FactoryWorld {
     std::vector<MPConstraint *> constraints;
     const auto &orders = dataProvider__.getOrders();
     const auto &machines = dataProvider__.getMachines();
-    // here startTime one to one mapps to orders
+    // here startTime one to one maps to orders
     // with index, referring to underly products
 
     assert(orders.size() == startTime.size());
@@ -221,17 +222,17 @@ namespace FactoryWorld {
       assert(productType.size() == prodStartTimes.size());
       // assume currentOrder.size() == prodStartTime.size()
       // per product of order
-      for (auto j = 0ul; j < prodStartTimes.size(); ++ j) {
+      for (auto p = 0ul; p < prodStartTimes.size(); ++ p) {
         // if this isn't the final product of the order
         // just skip the constraints
-        if (!currentOrder.finalProd(j)) continue;
+        if (!currentOrder.finalProd(p)) continue;
 
-        const auto &typeIndex = productType[j];
-        const auto &prodStart = prodStartTimes[j];
+        const auto &typeIndex = productType[p];
+        const auto &prodStart = prodStartTimes[p];
         // per machine that is capable
         for (auto k = 0ul; k < machines.size(); ++ k) {
           const auto &machine = machines[k];
-          const auto timesOnMach = currentOrder.requiredTime(j, k);
+          const auto timesOnMach = currentOrder.requiredTime(p, k);
 
           // add constraint if the machine can produce this type of product
           // doesn't pose constraints if the machine cannot produce the product
@@ -239,16 +240,16 @@ namespace FactoryWorld {
             constraints.emplace_back(
               solver.MakeRowConstraint(-infinity,
                 largeNumber - timesOnMach,
-                // TODO: How to make this mess into a templated or macro
-                makeName(purposeMessage, i, j, k)));
+                makeName(purposeMessage, i, p, k)));
             constraints.back()->SetCoefficient(prodStart, 1.0);
             constraints.back()->SetCoefficient(completionTimes[i], -1.0);
-            constraints.back()->SetCoefficient(onMachine[i][j][k], largeNumber);
+            constraints.back()->SetCoefficient(onMachine[i][p][k], largeNumber);
           }
         }
       }
     }
-    LOG(INFO) << purposeMessage;
+    LOG(INFO) << purposeMessage << " added number of constraints "
+              << constraints.size();
     return constraints;
   }
 
@@ -284,7 +285,9 @@ namespace FactoryWorld {
         }
       }
     }
-    LOG(INFO) << purposeMessage;
+
+    LOG(INFO) << purposeMessage << " added number of constraints "
+              << constraints.size();
     return constraints;
   }
 
@@ -329,7 +332,8 @@ namespace FactoryWorld {
         constraints.back()->SetCoefficient(onMachine[j][q][k], largeNumber);
       }
     }
-    LOG(INFO) << purposeMessage;
+    LOG(INFO) << purposeMessage << " added number of constraints "
+              << constraints.size();
     return constraints;
   }
 
@@ -355,7 +359,8 @@ namespace FactoryWorld {
         constraints.back()->SetCoefficient(currentStart[j], 1.0);
       }
     }
-    LOG(INFO) << purposeMessage;
+    LOG(INFO) << purposeMessage << " added number of constraints "
+              << constraints.size();
     return constraints;
   }
 
@@ -447,7 +452,9 @@ namespace FactoryWorld {
         }
       }
     }
-    LOG(INFO) << purposeMessage;
+    LOG(INFO) << purposeMessage << " added number of constraints "
+              << constraints.size();
+
     return constraints;
   }
 
@@ -473,7 +480,8 @@ namespace FactoryWorld {
         for (auto p = 0ul; p < onMachine[i].size(); ++ p) {
           for (auto q = 0ul; q < onMachine[j].size(); ++ q) {
             const auto &pOnMachine = iOnMachine[p];
-            const auto &qOnMachine = iOnMachine[q];
+            // i -> j, bug
+            const auto &qOnMachine = jOnMachine[q];
             // same product doesn't have restriction
             if (i == j && p == q) continue;
 
@@ -486,7 +494,13 @@ namespace FactoryWorld {
               // product q can only be scheduled after p
               // has finished, and wait for transfer time from
               // p -> q(transCost)
-              if (!machine.capable(type_p) || !machine.capable(type_q)) continue;
+
+              // on every machine, since there is no onMachine for
+              // dummyPrec, dummySucc
+              //DLOG(INFO) << machine.capable(type_p) << ' ' << machine.capable(type_q);
+              //if (!machine.capable(type_p) || !machine.capable(type_q)) continue;
+              //DLOG(INFO) << makeName(purposeMessage, i, p, j, q, k);
+
 
               // immediate relationship between product p, and q on machine k
               const auto &immediate_qp = immediatePrec[j][q][i][p][k];
@@ -494,6 +508,7 @@ namespace FactoryWorld {
               constraints.emplace_back(
                 solver.MakeRowConstraint(-infinity, 0,
                   makeName(purposeMessage, i, p, j, q, k)));
+
               constraints.back()->SetCoefficient(immediate_qp, 2.0);
               constraints.back()->SetCoefficient(immediate_pq, 2.0);
               constraints.back()->SetCoefficient(pOnMachine[k], -1.0);
@@ -503,7 +518,8 @@ namespace FactoryWorld {
         }
       }
     }
-    LOG(INFO) << purposeMessage;
+    LOG(INFO) << purposeMessage << " added number of constraints "
+              << constraints.size();
     return constraints;
   }
 
@@ -532,11 +548,12 @@ namespace FactoryWorld {
           const auto &machine = machines[k];
           if (machine.capable(typeIndex))
             constraints.back()->SetCoefficient(onMachine[i][p][k], 1);
-
         }
       }
     }
-    LOG(INFO) << purposeMessage;
+    LOG(INFO) << purposeMessage << " added number of constraints "
+              << constraints.size();
+
     return constraints;
   }
 
@@ -548,19 +565,25 @@ namespace FactoryWorld {
     const auto &machines = dataProvider__.getMachines();
     const auto &orders = dataProvider__.getOrders();
 
+    assert(orders.size() == onMachine.size());
     for (auto i = 0ul; i < onMachine.size(); ++ i) {
+      assert(orders[i].size() == onMachine[i].size());
       for (auto p = 0ul; p < onMachine[i].size(); ++ p) {
+        const auto typeIndex = orders[i].getProductType()[p];
         for (auto k = 0ul; k < machines.size(); ++ k) {
           // on machine that is incapable of manufacturing this product
           // add constraint
-          if (!machines[k].capable(p)) {
-            constraints.emplace_back(solver.MakeRowConstraint(0, 0,
+          // bug fix here, using p instead of typeIndex
+          if (!machines[k].capable(typeIndex)) {
+            constraints.emplace_back(solver.MakeRowConstraint(-infinity, 0,
                 makeName(purposeMessage, i, p, k)));
             constraints.back()->SetCoefficient(onMachine[i][p][k], 1.0);
           }
         }
       }
     }
+    LOG(INFO) << purposeMessage << " added number of constraints "
+              << constraints.size();
     return constraints;
   }
 
@@ -683,7 +706,8 @@ namespace FactoryWorld {
       constraints.back()->SetCoefficient(tardyTime[i], -1.0);
     }
 
-    LOG(INFO) << purposeMessage;
+    LOG(INFO) << purposeMessage << " added number of constraints "
+              << constraints.size();
     return constraints;
   }
 
@@ -707,7 +731,8 @@ namespace FactoryWorld {
       constraints.back()->SetCoefficient(earlyTime[i], 1.0);
     }
 
-    LOG(INFO) << purposeMessage;
+    LOG(INFO) << purposeMessage << " added number of constraints "
+              << constraints.size();
     return constraints;
   }
 
@@ -724,7 +749,8 @@ namespace FactoryWorld {
       constraints.back()->SetCoefficient(tardyTime[i], 1.0);
     }
 
-    LOG(INFO) << purposeMessage;
+    LOG(INFO) << purposeMessage << " added number of constraints "
+              << constraints.size();
     return constraints;
   }
 
@@ -740,7 +766,8 @@ namespace FactoryWorld {
           0, infinity, makeName(purposeMessage, i)));
       constraints.back()->SetCoefficient(earlyTime[i], 1.0);
     }
-    LOG(INFO) << purposeMessage;
+    LOG(INFO) << purposeMessage << " added number of constraints "
+              << constraints.size();
     return constraints;
   }
 
@@ -757,7 +784,7 @@ namespace FactoryWorld {
       // the first product dummyPrec[i][p][k] means that
       // product p will be the first to produce on line k
       constraints.emplace_back(
-        solver.MakeRowConstraint(1, 1,
+        solver.MakeRowConstraint(-infinity, 1,
           makeName(purposeMessage, k)));
       for (auto i = 0ul; i < sizeOrder; ++ i) {
         const auto sizeProduct = dummyPrec[i].size();
@@ -768,7 +795,8 @@ namespace FactoryWorld {
         }
       }
     }
-    LOG(INFO) << purposeMessage;
+    LOG(INFO) << purposeMessage << " added number of constraints "
+              << constraints.size();
     return constraints;
   }
 
@@ -785,7 +813,7 @@ namespace FactoryWorld {
       // the first product dummyPrec[i][p][k] means that
       // product p will be the first to produce on line k
       constraints.emplace_back(
-        solver.MakeRowConstraint(1, 1,
+        solver.MakeRowConstraint(0, 1,
           makeName(purposeMessage, k)));
       for (auto i = 0ul; i < sizeOrder; ++ i) {
         const auto sizeProduct = dummySucc[i].size();
@@ -796,9 +824,69 @@ namespace FactoryWorld {
         }
       }
     }
-    LOG(INFO) << purposeMessage;
+    LOG(INFO) << purposeMessage << " added number of constraints "
+              << constraints.size();
     return constraints;
   }
+
+  inline std::vector<MPConstraint *> Scheduler::
+  addConstraints_18(
+    const Var3D &onMachine,
+    const Var3D &dummyPrec,
+    MPSolver &solver, const std::string &purposeMessage) {
+    std::vector<MPConstraint *> constraints;
+    const auto sizeOrder = dummyPrec.size();
+    const auto machineSize = dataProvider__.getMachines().size();
+
+    for (auto k = 0ul; k < machineSize; ++ k) {
+      // product can only be head if it's on the line
+      for (auto i = 0ul; i < sizeOrder; ++ i) {
+        const auto sizeProduct = dummyPrec[i].size();
+        for (auto p = 0ul; p < sizeProduct; ++ p) {
+          constraints.emplace_back(
+            solver.MakeRowConstraint(-infinity, 0,
+              makeName(purposeMessage, i, p, k)));
+          assert(dummyPrec[i][p].size() == machineSize);
+          constraints.back()->SetCoefficient(dummyPrec[i][p][k], 1);
+          constraints.back()->SetCoefficient(onMachine[i][p][k], -1);
+        }
+      }
+    }
+
+    LOG(INFO) << purposeMessage << " added number of constraints "
+              << constraints.size();
+    return constraints;
+  }
+
+  inline std::vector<MPConstraint *> Scheduler::
+  addConstraints_19(
+    const Var3D &onMachine,
+    const Var3D &dummySucc,
+    MPSolver &solver, const std::string &purposeMessage) {
+    std::vector<MPConstraint *> constraints;
+    const auto sizeOrder = dummySucc.size();
+    const auto machineSize = dataProvider__.getMachines().size();
+
+    for (auto k = 0ul; k < machineSize; ++ k) {
+      // product can only be tail if it's on the line
+      for (auto i = 0ul; i < sizeOrder; ++ i) {
+        const auto sizeProduct = dummySucc[i].size();
+        for (auto p = 0ul; p < sizeProduct; ++ p) {
+          constraints.emplace_back(
+            solver.MakeRowConstraint(-infinity, 0,
+              makeName(purposeMessage, i, p, k)));
+          assert(dummySucc[i][p].size() == machineSize);
+          //dummyPrec[i][p][k]
+          constraints.back()->SetCoefficient(dummySucc[i][p][k], 1);
+          constraints.back()->SetCoefficient(onMachine[i][p][k], -1);
+        }
+      }
+    }
+    LOG(INFO) << purposeMessage << " added number of constraints "
+              << constraints.size();
+    return constraints;
+  }
+
 
   void Scheduler::factoryScheduler(std::shared_ptr<const Factory> factory,
     MPSolver::OptimizationProblemType optimization_problem_type)
@@ -807,6 +895,7 @@ namespace FactoryWorld {
     factory__ = factory;
     using namespace operations_research;
     LOG(INFO) << "Building planner";
+    //MPSolver solver("FactorySolver", optimization_problem_type);
     MPSolver solver("FactorySolver", optimization_problem_type);
 
     // prepare parameters
@@ -900,7 +989,7 @@ namespace FactoryWorld {
     addConstraints_1(completionTimes, makeSpan, solver,
       "CompletionTime shoule precede MakeSpan");
     addConstraints_2(startTime, completionTimes, onMachine, solver,
-      "BOM product relation precedence relation");
+      "CompletionTime later than all finished time of product");
     addConstraints_3(startTime, onMachine, solver,
       "dependent relation between product of same order");
     addConstraints_4(startTime, onMachine, solver,
@@ -933,10 +1022,12 @@ namespace FactoryWorld {
     addConstraints_13(completionTimes, earlyTime, solver,
       "early time");
 
-    addConstraints_14(tardyTime, solver,
-      "tardy time non-negative");
-    addConstraints_15(earlyTime, solver,
-      "early time non-negative");
+    // unnecessary given, the variable is bounded at initialization
+    // see before
+    // addConstraints_14(tardyTime, solver,
+    //   "tardy time non-negative");
+    // addConstraints_15(earlyTime, solver,
+    //   "early time non-negative");
 
     // rules on dummy variables
     addConstraints_16(dummyPrec, solver,
@@ -944,6 +1035,12 @@ namespace FactoryWorld {
 
     addConstraints_17(dummySucc, solver,
       "dummySucc of each line only one predecessor");
+
+    addConstraints_18(onMachine, dummyPrec, solver,
+      "product not head if not on the line");
+
+    addConstraints_19(onMachine, dummySucc, solver,
+      "product not tail if not on the line");
 
     // Objective
     MPObjective * const objective = solver.MutableObjective();
@@ -962,13 +1059,13 @@ namespace FactoryWorld {
     //   }
     // }
 
-    for (const auto & var: solver.variables()) {
-      DLOG(INFO) << var->name() << '\n';
-    }
+    // for (const auto & var: solver.variables()) {
+    //   DLOG(INFO) << var->name() << '\n';
+    // }
 
-    for (const auto &constraint : solver.constraints()) {
-      DLOG(INFO) << constraint->name() << '\n';
-    }
+    // for (const auto &constraint : solver.constraints()) {
+    //   DLOG(INFO) << constraint->name() << '\n';
+    // }
 
     const auto tardyCost = factory__->getTardyCost();
     const auto earlyCost = factory__->getearlyCost();
@@ -979,7 +1076,86 @@ namespace FactoryWorld {
       objective->SetCoefficient(earlyTime[i], earlyCost);
 
     objective->SetMinimization();
+    solver.EnableOutput();
+    LOG(INFO) << "took "
+              << static_cast<double>(solver.wall_time()) / 1000
+              << " seconds to build solver";
+    solver.set_time_limit(10000);
+    //std::cout << solver.time_limit() << '\n';
+
+    //    std::cout << solver.ComputeExactConditionNumber() << '\n';
     solver.Solve();
+    // if (solver.VerifySolution(1e-8, true)) {
+    //   LOG(INFO) << "No solution found";
+    //   return;
+    // }
+
+    std::cout << makeSpan->name() << ' '
+              << makeSpan->solution_value() << '\n';
+
+    for (auto i = 0ul; i < startTime.size(); ++ i) {
+      for (auto p = 0ul; p < startTime[i].size(); ++ p) {
+        std::cout << startTime[i][p]->name() << ' '
+                  << startTime[i][p]->solution_value() << ' '
+                  << completionTimes[i]->name() << ' '
+                  << completionTimes[i]->solution_value() << '\n';
+      }
+    }
+
+    for (auto i = 0ul;  i < onMachine.size(); ++ i) {
+      for (auto p = 0ul; p < onMachine[i].size(); ++ p) {
+        for (auto k = 0ul; k < onMachine[i][p].size(); ++ k) {
+          if (onMachine[i][p][k]->solution_value()) {
+            std::cout << makeName("product", i, p)
+                      << " on line " << k << '\n';
+          }
+        }
+      }
+    }
+
+    for (auto i = 0ul; i < immediatePrec.size(); ++ i) {
+      for (auto p = 0ul; p < immediatePrec[i].size(); ++ p) {
+        for (auto j = 0ul; j < immediatePrec[i][p].size(); ++ j) {
+          for (auto q = 0ul; q < immediatePrec[i][p][j].size(); ++ q) {
+            for (auto k = 0ul; k < immediatePrec[i][p][j][q].size(); ++ k) {
+              if (immediatePrec[i][p][j][q][k]->solution_value()) {
+                std::cout << makeName("product", i, p)
+                          << " precedes "
+                          << makeName("product", j, q)
+                          << " on "
+                          << makeName("machine", k)
+                          << '\n';
+              }
+            }
+          }
+        }
+      }
+    }
+
+    for (auto i = 0ul; i < immediatePrec.size(); ++ i) {
+      for (auto p = 0ul; p < immediatePrec[i].size(); ++ p) {
+        for (auto k = 0ul; k < immediatePrec[i][p].size(); ++ k) {
+          if (dummyPrec[i][p][k]->solution_value()) {
+            std::cout << makeName("product", i, p)
+                      << " is the first on line "
+                      << k << '\n';
+          }
+        }
+      }
+    }
+
+    for (auto i = 0ul; i < immediatePrec.size(); ++ i) {
+      for (auto p = 0ul; p < immediatePrec[i].size(); ++ p) {
+        for (auto k = 0ul; k < immediatePrec[i][p].size(); ++ k) {
+          if (dummySucc[i][p][k]->solution_value()) {
+            std::cout << makeName("product", i, p)
+                      << " is the last on line "
+                      << k << '\n';
+          }
+        }
+      }
+    }
+
     std::cout << objective->Value() << '\n';
   }
 }

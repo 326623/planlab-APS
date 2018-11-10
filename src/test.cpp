@@ -30,16 +30,17 @@ DEFINE_string(
   "the file containing information about the world of factory");
 DEFINE_validator(factory_world, &ValidateFilename);
 int main(int argc, char **argv) {
+  std::ios::sync_with_stdio(false);
   gflags::SetUsageMessage(kUsage);
   gflags::ParseCommandLineFlags(&argc, &argv, true);
   using namespace FactoryWorld;
   std::shared_ptr<Factory> myFactory = std::make_shared<Factory>();
   myFactory->load(FLAGS_factory_world);
   Scheduler planner;
-  // planner.factoryScheduler(myFactory,
-  //   operations_research::MPSolver::CBC_MIXED_INTEGER_PROGRAMMING);//GLOP_LINEAR_PROGRAMMING);
   planner.factoryScheduler(myFactory,
-    operations_research::MPSolver::GLOP_LINEAR_PROGRAMMING);
+    operations_research::MPSolver::CBC_MIXED_INTEGER_PROGRAMMING);//GLOP_LINEAR_PROGRAMMING);
+  // planner.factoryScheduler(myFactory,
+  //   operations_research::MPSolver::BOP_INTEGER_PROGRAMMING);
   // std::cout << myFactory.getBOM().getBOM() << '\n';
 
   // for (const auto &machine : myFactory.getMachines()) {

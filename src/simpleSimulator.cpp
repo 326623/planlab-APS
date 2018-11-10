@@ -14,7 +14,7 @@ int main() {
 
   Simulator::Simulator<
     Simulator::Order<int>,
-    Simulator::OrderGenerator<int>> simulator(2);
+    Simulator::OrderGenerator<int>> simulator(10);
   std::vector<Simulator::Order<int>> randomOrders;
   for (int i = -30; i <= 0; ++ i) {
     orderGen.setStartTime(i);

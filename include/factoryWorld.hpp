@@ -268,7 +268,8 @@ namespace FactoryWorld {
     using MPVariable = operations_research::MPVariable;
     using Var3D = std::vector<std::vector<std::vector<MPVariable *>>>;
     constexpr static double infinity = std::numeric_limits<double>::infinity();
-    constexpr static double largeNumber = std::numeric_limits<double>::max();
+    // due to limitation of or tool, have to limit largeNumber range
+    constexpr static double largeNumber = 1.0e5;//std::numeric_limits<double>::max();
 
     /**
      * OrderWithDep will extend the the original product list
@@ -473,6 +474,18 @@ namespace FactoryWorld {
 
     inline std::vector<MPConstraint *>
     addConstraints_17(
+      const Var3D &dummySucc,
+      MPSolver &solver, const std::string &purposeMessage);
+
+    inline std::vector<MPConstraint *>
+    addConstraints_18(
+      const Var3D &onMachine,
+      const Var3D &dummyPrec,
+      MPSolver &solver, const std::string &purposeMessage);
+
+    inline std::vector<MPConstraint *>
+    addConstraints_19(
+      const Var3D &onMachine,
       const Var3D &dummySucc,
       MPSolver &solver, const std::string &purposeMessage);
 
