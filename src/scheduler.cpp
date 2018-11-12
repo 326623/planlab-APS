@@ -229,21 +229,21 @@ namespace FactoryWorld {
 
         const auto &typeIndex = productType[p];
         const auto &prodStart = prodStartTimes[p];
+        constraints.emplace_back(
+          solver.MakeRowConstraint(-infinity, 0,
+            makeName(purposeMessage, i, p)));
+
         // per machine that is capable
         for (auto k = 0ul; k < machines.size(); ++ k) {
           const auto &machine = machines[k];
-          const auto timesOnMach = currentOrder.requiredTime(p, k);
+          const auto timeOnMach = currentOrder.requiredTime(p, k);
 
           // add constraint if the machine can produce this type of product
           // doesn't pose constraints if the machine cannot produce the product
           if (machine.capable(typeIndex)) {
-            constraints.emplace_back(
-              solver.MakeRowConstraint(-infinity,
-                largeNumber - timesOnMach,
-                makeName(purposeMessage, i, p, k)));
             constraints.back()->SetCoefficient(prodStart, 1.0);
             constraints.back()->SetCoefficient(completionTimes[i], -1.0);
-            constraints.back()->SetCoefficient(onMachine[i][p][k], largeNumber);
+            constraints.back()->SetCoefficient(onMachine[i][p][k], timeOnMach);
           }
         }
       }
@@ -269,19 +269,19 @@ namespace FactoryWorld {
       // for every pair of dependency, add to constraint
       for (const auto &pairIndex : dep) {
         // <p, q> pair, p can start only if q has finished
+        const auto p = pairIndex.first;
+        const auto q = pairIndex.second;
+        constraints.emplace_back(
+          solver.MakeRowConstraint(-infinity, 0,
+            makeName(purposeMessage, i, p, q)));
+
+        constraints.back()->SetCoefficient(currentStart[q], 1.0);
+        constraints.back()->SetCoefficient(currentStart[p], -1.0);
         for (auto k = 0ul; k < machines.size(); ++ k) {
-          const auto &machine = machines[k];
-          const auto p = pairIndex.first;
-          const auto q = pairIndex.second;
           // product q required time on machine k
           const auto timeOnMach = currentOrder.requiredTime(q, k);
-          constraints.emplace_back(
-            solver.MakeRowConstraint(-infinity,
-              largeNumber - timeOnMach,
-              makeName(purposeMessage, i, p, q, k)));
-          constraints.back()->SetCoefficient(currentStart[q], 1.0);
-          constraints.back()->SetCoefficient(currentStart[p], -1.0);
-          constraints.back()->SetCoefficient(onMachine[i][q][k], largeNumber);
+          if (timeOnMach != infinity)
+            constraints.back()->SetCoefficient(onMachine[i][q][k], timeOnMach);
         }
       }
     }
@@ -380,16 +380,16 @@ namespace FactoryWorld {
       const auto &currentStart = startTime[i];
       for (auto p = 0ul; p < currentStart.size(); ++ p) {
         const auto typeIndex = currentOrder.getProductType()[p];
+        constraints.emplace_back(
+          solver.MakeRowConstraint(
+            -infinity, 0, makeName(purposeMessage, i, p)));
+
         for (auto k = 0ul; k < machines.size(); ++ k) {
           const auto &machine = machines[k];
           const auto &ready = machine.getReadyTime();
           if (machine.capable(typeIndex)) {
-            constraints.emplace_back(
-              solver.MakeRowConstraint(
-                ready - largeNumber,
-                infinity, makeName(purposeMessage, i, p, k)));
-            constraints.back()->SetCoefficient(currentStart[p], 1.0);
-            constraints.back()->SetCoefficient(onMachine[i][p][k], -largeNumber);
+            constraints.back()->SetCoefficient(currentStart[p], -1.0);
+            constraints.back()->SetCoefficient(onMachine[i][p][k], ready);
           }
         }
       }
@@ -934,7 +934,7 @@ namespace FactoryWorld {
     MPVariable const *makeSpan = solver.MakeNumVar(0.0, infinity, "MakeSpan");
     std::vector<MPVariable *> completionTimes;
 
-    const auto &orders = factory->getOrders();
+    const auto &orders = dataProvider__.getOrders();
     const auto orderSize = orders.size();
     const auto &machines = dataProvider__.getMachines();
     const auto machineSize = machines.size();
@@ -1089,48 +1089,75 @@ namespace FactoryWorld {
     // }
 
     const auto tardyCost = factory__->getTardyCost();
-    const auto earlyCost = factory__->getearlyCost();
+    const auto earlyCost = factory__->getEarlyCost();
+    const auto idleCost = factory__->getIdleCost();
     for (auto i = 0; i < orderSize; ++ i)
       objective->SetCoefficient(tardyTime[i], tardyCost);
 
     for (auto i = 0; i < orderSize; ++ i)
       objective->SetCoefficient(earlyTime[i], earlyCost);
 
+    // idle time
+    objective->SetCoefficient(makeSpan, idleCost * machines.size());
+    // minus ready time
+    Float readyTotal = 0.0;
+    for (auto k = 0ul; k < machines.size(); ++ k) {
+       readyTotal += machines[k].getReadyTime();
+    }
+    objective->SetOffset(readyTotal);
+    // product manufacturing time
+    for (auto i = 0; i < orderSize; ++ i) {
+      for (auto p = 0ul; p < orders[i].size(); ++ p) {
+        const auto typeIndex = orders[i].getProductType()[p];
+        for (auto k = 0ul; k < machines.size(); ++ k) {
+          const auto time = orders[i].requiredTime(p, k);
+          if (time != infinity) {
+            objective->SetCoefficient(onMachine[i][p][k], - time * idleCost);
+          }
+        }
+      }
+    }
+
+    // auto model = static_cast<OsiClpSolverInterface>(solver.underlying_solver());
+    // if (!model.haveMultiThreadSupport()) LOG(FATAL) << "end";
+    // model.setThreadMode(2);
+    // model.setNumberThreads(12);
+
+
     objective->SetMinimization();
     solver.EnableOutput();
     LOG(INFO) << "took "
               << static_cast<double>(solver.wall_time()) / 1000
               << " seconds to build solver";
-    solver.set_time_limit(10000);
+
+    LOG(INFO) << "Number of constraints " << solver.NumConstraints();
+    LOG(INFO) << "Number of variables " << solver.NumVariables();
+    solver.set_time_limit(20000);
     //std::cout << solver.time_limit() << '\n';
 
     //    std::cout << solver.ComputeExactConditionNumber() << '\n';
+    //    solver.ClampSolutionWithinBounds();
     solver.Solve();
     // if (solver.VerifySolution(1e-8, true)) {
     //   LOG(INFO) << "No solution found";
     //   return;
     // }
 
+
     std::cout << makeSpan->name() << ' '
               << makeSpan->solution_value() << '\n';
 
     for (auto i = 0ul; i < startTime.size(); ++ i) {
       for (auto p = 0ul; p < startTime[i].size(); ++ p) {
-        std::cout << startTime[i][p]->name() << ' '
-                  << startTime[i][p]->solution_value() << ' '
-                  << completionTimes[i]->name() << ' '
-                  << completionTimes[i]->solution_value() << '\n';
-      }
-    }
-
-    for (auto i = 0ul;  i < onMachine.size(); ++ i) {
-      for (auto p = 0ul; p < onMachine[i].size(); ++ p) {
         for (auto k = 0ul; k < onMachine[i][p].size(); ++ k) {
           if (onMachine[i][p][k]->solution_value()) {
-            std::cout << makeName("product", i, p)
-                      << " on line " << k << '\n';
+            std::cout << makeName("product", i, p) << ' '
+                      << startTime[i][p]->solution_value() << ' '
+                      << " on line " << k << " requires "
+                      << orders[i].requiredTime(p, k) << k;
           }
         }
+        std::cout << '\n';
       }
     }
 
@@ -1140,13 +1167,6 @@ namespace FactoryWorld {
           for (auto q = 0ul; q < immediatePrec[i][p][j].size(); ++ q) {
             for (auto k = 0ul; k < immediatePrec[i][p][j][q].size(); ++ k) {
               if (i == j && p == q) continue;
-              // const auto &typeIndex_p = orders[i].getProductType()[p];
-              // const auto &typeIndex_q = orders[j].getProductType()[q];
-              // if (!machines[k].capable(typeIndex_p) ||
-              //   !machines[k].capable(typeIndex_q)) continue;
-
-              // std::cout << makeName("", p, q) << immediatePrec[i][p][j][q][k]->solution_value() << ' ';
-              //std::cout << immediatePrec[j][q][i][p][k]->solution_value() << ' ';
               if (immediatePrec[i][p][j][q][k]->solution_value() &&
                 onMachine[i][p][k]->solution_value() && onMachine[j][q][k]->solution_value()) {
                 std::cout << makeName("product", i, p)
@@ -1157,7 +1177,6 @@ namespace FactoryWorld {
                           << '\n';
               }
             }
-            //std::cout << '\n';
           }
         }
       }

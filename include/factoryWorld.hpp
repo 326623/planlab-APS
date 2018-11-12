@@ -245,8 +245,11 @@ namespace FactoryWorld {
     Float getTardyCost() const
     { return tardyCost_; }
 
-    Float getearlyCost() const
+    Float getEarlyCost() const
     { return earlyCost_; }
+
+    Float getIdleCost() const
+    { return idleCost_; }
   };
 
   // for debugging
@@ -269,7 +272,9 @@ namespace FactoryWorld {
     using Var3D = std::vector<std::vector<std::vector<MPVariable *>>>;
     constexpr static double infinity = std::numeric_limits<double>::infinity();
     // due to limitation of or tool, have to limit largeNumber range
-    constexpr static double largeNumber = 1.0e5;//std::numeric_limits<double>::max();
+    // critical parameter to tweak, 1.0e20 can't yield good solution
+    constexpr static double largeNumber = 1.0e2;
+    //std::numeric_limits<double>::max();
 
     /**
      * OrderWithDep will extend the the original product list
