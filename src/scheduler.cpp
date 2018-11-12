@@ -378,21 +378,24 @@ namespace FactoryWorld {
     for (auto i = 0ul; i < startTime.size(); ++ i) {
       const auto &currentOrder = orders[i];
       const auto &currentStart = startTime[i];
-      for (auto j = 0ul; j < currentStart.size(); ++ j) {
+      for (auto p = 0ul; p < currentStart.size(); ++ p) {
+        const auto typeIndex = currentOrder.getProductType()[p];
         for (auto k = 0ul; k < machines.size(); ++ k) {
           const auto &machine = machines[k];
           const auto &ready = machine.getReadyTime();
-          //if (machine.capable())
-          constraints.emplace_back(
-            solver.MakeRowConstraint(
-              ready - largeNumber,
-              infinity, makeName(purposeMessage, i, j, k)));
-          constraints.back()->SetCoefficient(currentStart[j], 1.0);
-          constraints.back()->SetCoefficient(onMachine[i][j][k], -largeNumber);
+          if (machine.capable(typeIndex)) {
+            constraints.emplace_back(
+              solver.MakeRowConstraint(
+                ready - largeNumber,
+                infinity, makeName(purposeMessage, i, p, k)));
+            constraints.back()->SetCoefficient(currentStart[p], 1.0);
+            constraints.back()->SetCoefficient(onMachine[i][p][k], -largeNumber);
+          }
         }
       }
     }
-    LOG(INFO) << purposeMessage;
+    LOG(INFO) << purposeMessage << " added number of constraints "
+              << constraints.size();
     return constraints;
   }
 
@@ -498,7 +501,7 @@ namespace FactoryWorld {
               // on every machine, since there is no onMachine for
               // dummyPrec, dummySucc
               //DLOG(INFO) << machine.capable(type_p) << ' ' << machine.capable(type_q);
-              //if (!machine.capable(type_p) || !machine.capable(type_q)) continue;
+              if (!machine.capable(type_p) || !machine.capable(type_q)) continue;
               //DLOG(INFO) << makeName(purposeMessage, i, p, j, q, k);
 
 
@@ -599,8 +602,10 @@ namespace FactoryWorld {
 
     // predecessor relation
     std::vector<std::vector<MPConstraint *>> constraintsPrec(orders.size());
+    auto countConstraints = 0;
     for (auto i = 0ul; i < orders.size(); ++ i) {
       for (auto p = 0ul; p < orders[i].size(); ++ p) {
+        ++countConstraints;
         constraintsPrec[i].emplace_back(
           solver.MakeRowConstraint(1, 1,
             makeName(purposeMessage, i, p) + "_Prec"));
@@ -611,7 +616,9 @@ namespace FactoryWorld {
     // or is true for dummpyPrec on line k, indicating it's the first on line k
     for (auto i = 0ul; i < orders.size(); ++ i) {
       for (auto p = 0ul; p < orders[i].size(); ++ p) {
+        const auto &typeIndex_p = orders[i].getProductType()[p];
         for (auto k = 0ul; k < machines.size(); ++ k) {
+          //if (!machines[k].capable(typeIndex_p)) continue;
           constraintsPrec[i][p]->SetCoefficient(dummyPrec[i][p][k], 1);
         }
       }
@@ -621,10 +628,14 @@ namespace FactoryWorld {
       for (auto q = 0ul; q < immediatePrec[j].size(); ++ q) {
         for (auto i = 0ul; i < immediatePrec[j][q].size(); ++ i) {
           for (auto p = 0ul; p < immediatePrec[j][q][i].size(); ++ p) {
+            const auto &typeIndex_p = orders[i].getProductType()[p];
+            const auto &typeIndex_q = orders[j].getProductType()[q];
             for (auto k = 0ul; k < immediatePrec[j][q][i][p].size(); ++ k) {
               if (j == i && q == p) continue;
               // for constraint of product p, accumulate all product q
               // excluding q == p
+              if (!machines[k].capable(typeIndex_p) ||
+                !machines[k].capable(typeIndex_q)) continue;
               constraintsPrec[i][p]->SetCoefficient(immediatePrec[j][q][i][p][k], 1);
             }
           }
@@ -636,6 +647,7 @@ namespace FactoryWorld {
     std::vector<std::vector<MPConstraint *>> constraintsSucc(orders.size());
     for (auto i = 0ul; i < orders.size(); ++ i) {
       for (auto p = 0ul; p < orders[i].size(); ++ p) {
+        ++countConstraints;
         constraintsSucc[i].emplace_back(
           solver.MakeRowConstraint(1, 1,
             makeName(purposeMessage, i, p) + "_Succ"));
@@ -646,7 +658,9 @@ namespace FactoryWorld {
     // or is true for dummpySucc on line k, indicating it's the first on line k
     for (auto i = 0ul; i < orders.size(); ++ i) {
       for (auto p = 0ul; p < orders[i].size(); ++ p) {
+        const auto &typeIndex_p = orders[i].getProductType()[p];
         for (auto k = 0ul; k < machines.size(); ++ k) {
+          //if (!machines[k].capable(typeIndex_p)) continue;
           constraintsSucc[i][p]->SetCoefficient(dummySucc[i][p][k], 1);
         }
       }
@@ -658,9 +672,13 @@ namespace FactoryWorld {
         for (auto i = 0ul; i < immediatePrec[j][q].size(); ++ i) {
           for (auto p = 0ul; p < immediatePrec[j][q][i].size(); ++ p) {
             for (auto k = 0ul; k < immediatePrec[j][q][i][p].size(); ++ k) {
+              const auto &typeIndex_p = orders[i].getProductType()[p];
+              const auto &typeIndex_q = orders[j].getProductType()[q];
               if (j == i && q == p) continue;
               // for constraint of product p, accumulate all product q
               // excluding q == p
+              if (!machines[k].capable(typeIndex_p) ||
+                !machines[k].capable(typeIndex_q)) continue;
               constraintsSucc[i][p]->SetCoefficient(immediatePrec[i][p][j][q][k], 1);
             }
           }
@@ -680,7 +698,8 @@ namespace FactoryWorld {
     //     }
     // }
 
-    LOG(INFO) << purposeMessage;
+    LOG(INFO) << purposeMessage << " added number of constraints "
+              << countConstraints;
     LOG(WARNING) << "return null constraint for now.";
     return std::vector<MPConstraint *>();
   }
@@ -836,13 +855,15 @@ namespace FactoryWorld {
     MPSolver &solver, const std::string &purposeMessage) {
     std::vector<MPConstraint *> constraints;
     const auto sizeOrder = dummyPrec.size();
-    const auto machineSize = dataProvider__.getMachines().size();
+    const auto &machines = dataProvider__.getMachines();
+    const auto machineSize = machines.size();
 
     for (auto k = 0ul; k < machineSize; ++ k) {
       // product can only be head if it's on the line
       for (auto i = 0ul; i < sizeOrder; ++ i) {
         const auto sizeProduct = dummyPrec[i].size();
         for (auto p = 0ul; p < sizeProduct; ++ p) {
+          //if (!machines[k].capable(p)) continue;
           constraints.emplace_back(
             solver.MakeRowConstraint(-infinity, 0,
               makeName(purposeMessage, i, p, k)));
@@ -1118,7 +1139,16 @@ namespace FactoryWorld {
         for (auto j = 0ul; j < immediatePrec[i][p].size(); ++ j) {
           for (auto q = 0ul; q < immediatePrec[i][p][j].size(); ++ q) {
             for (auto k = 0ul; k < immediatePrec[i][p][j][q].size(); ++ k) {
-              if (immediatePrec[i][p][j][q][k]->solution_value()) {
+              if (i == j && p == q) continue;
+              // const auto &typeIndex_p = orders[i].getProductType()[p];
+              // const auto &typeIndex_q = orders[j].getProductType()[q];
+              // if (!machines[k].capable(typeIndex_p) ||
+              //   !machines[k].capable(typeIndex_q)) continue;
+
+              // std::cout << makeName("", p, q) << immediatePrec[i][p][j][q][k]->solution_value() << ' ';
+              //std::cout << immediatePrec[j][q][i][p][k]->solution_value() << ' ';
+              if (immediatePrec[i][p][j][q][k]->solution_value() &&
+                onMachine[i][p][k]->solution_value() && onMachine[j][q][k]->solution_value()) {
                 std::cout << makeName("product", i, p)
                           << " precedes "
                           << makeName("product", j, q)
@@ -1127,14 +1157,15 @@ namespace FactoryWorld {
                           << '\n';
               }
             }
+            //std::cout << '\n';
           }
         }
       }
     }
 
-    for (auto i = 0ul; i < immediatePrec.size(); ++ i) {
-      for (auto p = 0ul; p < immediatePrec[i].size(); ++ p) {
-        for (auto k = 0ul; k < immediatePrec[i][p].size(); ++ k) {
+    for (auto i = 0ul; i < dummyPrec.size(); ++ i) {
+      for (auto p = 0ul; p < dummyPrec[i].size(); ++ p) {
+        for (auto k = 0ul; k < dummyPrec[i][p].size(); ++ k) {
           if (dummyPrec[i][p][k]->solution_value()) {
             std::cout << makeName("product", i, p)
                       << " is the first on line "
@@ -1144,9 +1175,9 @@ namespace FactoryWorld {
       }
     }
 
-    for (auto i = 0ul; i < immediatePrec.size(); ++ i) {
-      for (auto p = 0ul; p < immediatePrec[i].size(); ++ p) {
-        for (auto k = 0ul; k < immediatePrec[i][p].size(); ++ k) {
+    for (auto i = 0ul; i < dummySucc.size(); ++ i) {
+      for (auto p = 0ul; p < dummySucc[i].size(); ++ p) {
+        for (auto k = 0ul; k < dummySucc[i][p].size(); ++ k) {
           if (dummySucc[i][p][k]->solution_value()) {
             std::cout << makeName("product", i, p)
                       << " is the last on line "
@@ -1155,6 +1186,13 @@ namespace FactoryWorld {
         }
       }
     }
+
+    // for (auto i = 0ul; i < machines.size(); ++ i) {
+    //   if (machines[i].capable(46)) {
+    //     std::cout << i << ' ';
+    //   }
+    // }
+    //std::cout << machines[10].getCapability()[46] << '\n';
 
     std::cout << objective->Value() << '\n';
   }
