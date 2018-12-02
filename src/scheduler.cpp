@@ -910,7 +910,8 @@ namespace FactoryWorld {
 
 
   void Scheduler::factoryScheduler(std::shared_ptr<const Factory> factory,
-    MPSolver::OptimizationProblemType optimization_problem_type)
+    MPSolver::OptimizationProblemType optimization_problem_type,
+    double lambda, double timeLimit)
   {
     dataProvider__ = DataProvider(factory);
     factory__ = factory;
@@ -1105,14 +1106,30 @@ namespace FactoryWorld {
        readyTotal += machines[k].getReadyTime();
     }
     objective->SetOffset(readyTotal);
-    // product manufacturing time
+
     for (auto i = 0; i < orderSize; ++ i) {
       for (auto p = 0ul; p < orders[i].size(); ++ p) {
         const auto typeIndex = orders[i].getProductType()[p];
         for (auto k = 0ul; k < machines.size(); ++ k) {
           const auto time = orders[i].requiredTime(p, k);
+          // product manufacturing time
           if (time != infinity) {
             objective->SetCoefficient(onMachine[i][p][k], - time * idleCost);
+          }
+          // l1 normalization
+          objective->SetCoefficient(onMachine[i][p][k], lambda);
+        }
+      }
+    }
+
+    for (auto i = 0; i < orderSize; ++ i) {
+      for (auto p = 0ul; p < orders[i].size(); ++ p) {
+        for (auto j = 0ul; j < orderSize; ++ j) {
+          for (auto q = 0ul; q < orders[j].size(); ++ q) {
+            for (auto k = 0ul; k < machines.size(); ++ k) {
+              // l1 normalization
+              objective->SetCoefficient(immediatePrec[i][p][j][q][k], lambda);
+            }
           }
         }
       }
@@ -1132,7 +1149,7 @@ namespace FactoryWorld {
 
     LOG(INFO) << "Number of constraints " << solver.NumConstraints();
     LOG(INFO) << "Number of variables " << solver.NumVariables();
-    solver.set_time_limit(20000);
+    solver.set_time_limit(timeLimit);
     //std::cout << solver.time_limit() << '\n';
 
     //    std::cout << solver.ComputeExactConditionNumber() << '\n';
@@ -1142,7 +1159,31 @@ namespace FactoryWorld {
     //   LOG(INFO) << "No solution found";
     //   return;
     // }
+    double l1_sum = 0;
 
+    for (auto i = 0; i < orderSize; ++ i) {
+      for (auto p = 0ul; p < orders[i].size(); ++ p) {
+        const auto typeIndex = orders[i].getProductType()[p];
+        for (auto k = 0ul; k < machines.size(); ++ k) {
+          // l1 normalization
+          l1_sum += onMachine[i][p][k]->solution_value() * lambda;
+        }
+      }
+    }
+
+    for (auto i = 0; i < orderSize; ++ i) {
+      for (auto p = 0ul; p < orders[i].size(); ++ p) {
+        for (auto j = 0ul; j < orderSize; ++ j) {
+          for (auto q = 0ul; q < orders[j].size(); ++ q) {
+            for (auto k = 0ul; k < machines.size(); ++ k) {
+              // l1 normalization
+              l1_sum += immediatePrec[i][p][j][q][k]->solution_value() * lambda;
+            }
+          }
+        }
+      }
+    }
+    std::cout << l1_sum << '\n';
 
     std::cout << makeSpan->name() << ' '
               << makeSpan->solution_value() << '\n';

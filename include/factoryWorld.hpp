@@ -498,7 +498,9 @@ namespace FactoryWorld {
     explicit Scheduler() {}
 
     void factoryScheduler(std::shared_ptr<const Factory> factory,
-      MPSolver::OptimizationProblemType optimization_problem_type);
+      MPSolver::OptimizationProblemType optimization_problem_type,
+      double lambda, double timeLimit);
+
   };
 }
 

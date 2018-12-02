@@ -24,11 +24,21 @@ static bool ValidateFilename(const char *flagname, const string &value) {
   return value.size() > 0;
 }
 
+static bool ValidateLambda(const char *flagname, const double lambda) {
+  return lambda > 0.0;
+}
+
 DEFINE_string(
   factory_world,
   "", // no default
   "the file containing information about the world of factory");
+DEFINE_double(lambda,
+              0.01,
+              "The weight of l1 norm");
+DEFINE_double(time_limit, 10, "Time limit for the solver(seconds)");
+
 DEFINE_validator(factory_world, &ValidateFilename);
+DEFINE_validator(lambda, &ValidateLambda);
 int main(int argc, char **argv) {
   std::ios::sync_with_stdio(false);
   gflags::SetUsageMessage(kUsage);
@@ -38,7 +48,8 @@ int main(int argc, char **argv) {
   myFactory->load(FLAGS_factory_world);
   Scheduler planner;
   planner.factoryScheduler(myFactory,
-    operations_research::MPSolver::CBC_MIXED_INTEGER_PROGRAMMING);//GLOP_LINEAR_PROGRAMMING);
+    operations_research::MPSolver::CBC_MIXED_INTEGER_PROGRAMMING, //GLOP_LINEAR_PROGRAMMING);
+    FLAGS_lambda, FLAGS_time_limit * 1000);
   // planner.factoryScheduler(myFactory,
   //   operations_research::MPSolver::BOP_INTEGER_PROGRAMMING);
   // std::cout << myFactory.getBOM().getBOM() << '\n';
