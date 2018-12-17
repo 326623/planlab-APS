@@ -25,6 +25,7 @@
 #ifndef _NEWJOY_FACTORYWORLD_HPP_
 #define _NEWJOY_FACTORYWORLD_HPP_
 
+// ortools dependencies
 #include <ortools/base/logging.h>
 #include <ortools/base/filelineiter.h>
 #include <ortools/base/split.h>
@@ -34,15 +35,16 @@
 // small help from eigen to get inverse of BOM
 #include <Eigen/Dense>
 
+// std library io stream
 #include <fstream>
 #include <sstream>
 
 #include "utils.hpp"
 /**
- * Implementation of processing raw data(input) into internel
- * factoryWorld representation
+ * \brief This namespace provides a collection of classes and methods to read raw data, process, and solve.
+ *
+ * TODO
  */
-
 namespace FactoryWorld {
   // should guarantee that these are streamable
   using Integral = int;
@@ -77,12 +79,9 @@ namespace FactoryWorld {
                      [](Float x) { return x > 0.0; });
     }
 
-    // return true if the machine is capable of manufacturing
-    // this type of product(by index)
     bool capable(Integral typeIndex) const
     { return capableProduct_[typeIndex]; }
 
-    // compute production time when given product type and its quantity
     Float produceTime(Integral typeIndex, Integral numProduct) const
     { return static_cast<double>(numProduct) / capability_[typeIndex]; }
 
@@ -96,13 +95,6 @@ namespace FactoryWorld {
     { return readyTime_; }
   };
 
-  /**
-   * Generalize from Bill of Material model
-   * This class contains the information between products
-   * i.e, which two product has dependency
-   * which two product has to be kept apart for some time
-   * which two product
-   */
   class RelationOfProducts {
     using MatrixXd = Eigen::MatrixXd;
     using MatrixB = Eigen::Matrix<bool, Eigen::Dynamic,
@@ -259,6 +251,8 @@ namespace FactoryWorld {
    * Scheduler class handles the planning by expressing it under
    * linear constraint
    *
+   * @f$ v_n = \frac{1}{n^2} \sum_{k=1}^n \frac{6k^2-2k}{n+3}\qquad\forall n=1,\ldots,m  @f$
+   * <a href="http://de.wikipedia.org/wiki/Grundumsatz#Harris-Benedict-Formel">Harris-Benedict-Formel</a>
    * Itself would takes some unmutable Factory as data input
    * compute and store some temporary variables
    */

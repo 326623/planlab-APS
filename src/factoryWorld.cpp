@@ -1,6 +1,50 @@
 #include "factoryWorld.hpp"
 
 namespace FactoryWorld {
+  /** \class Machine
+   * \brief   Contains information of production line.
+   *
+   * \fn Machine::capable
+   * \brief   if the production line can produce this type represented by index.
+   *
+   * \fn explicit Machine::Machine(std::vector<Float> capability, Float readyTime)
+   * \brief   construct product line given information.
+   * \param[in]   capability   products per unit time, i.e. speed of production, each product type.
+   * \param[in]   readyTime    No product can be scheduled before this time.
+   *
+   * \fn bool Machine::capable(Integral typeIndex) const
+   * \brief   if the line can produce this product by index.
+   * \param[in]   typeIndex   product index.
+   *
+   * \fn Float Machine::produceTime(Integral typeIndex, Integral numProduct) const
+   * \brief   the time needed to produce 1 unit of some product.
+   * \param[in]   typeIndex   product index.
+   * \param[in]   numProduct  the number of products.
+   *
+   * \fn const std::vector<bool> & Machine::getCapableProduct() const
+   * \brief   returns the boolean vector indicating product capabilities.
+   *
+   * \fn const std::vector<Float> & Machine::getCapability() const
+   * \brief   returns the product per unit time of all products.
+   *
+   */
+
+  /** \class RelationOfProducts
+   * \brief   This class contains the relational information between products.
+   *
+   * This is the Generalization of Bill of Material(BOM) model, with the following types of relation:
+   * - dependency between two products, i.e., one product precedes another.
+   * - mutex between two products, i.e., enforce time interval between two products.
+   *
+   * \fn   explicit RelationOfProducts::RelationOfProducts(MatrixXd bom, MatrixTime gap)
+   * Checking of constraints will be done inside:
+   * - both bom and gap must be square.
+   * - no negative value in bom and gap
+   * -
+   * \param[in]   MatrixXd   bom dependency matrix, number of products to produce another.
+   * \param[in]   MatrixTime time gap between two products.
+   */
+
   //using MatrixXd = Eigen::MatrixXd;
   //using MatrixB = Eigen::Matrix<bool, Eigen::Dynamic, Eigen::Dynamic>;
   /**
