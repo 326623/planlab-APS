@@ -80,13 +80,13 @@ namespace Simulator
   class OrderGenerator {
   private:
     std::random_device _randomDev;
+    Integral _partNum;
+    std::vector<double> _leadScale;
     mutable std::mt19937 _gen;
     mutable std::uniform_int_distribution<Integral> _productNumRand;
     mutable std::uniform_int_distribution<Integral> _clientIdRand;
     mutable std::uniform_int_distribution<Integral> _typeRand;
     mutable std::uniform_int_distribution<Integral> _scaleRand;
-    Integral _partNum;
-    std::vector<double> _leadScale;
     Integral _startTime;
 
   public:

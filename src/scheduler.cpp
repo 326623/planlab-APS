@@ -4,6 +4,44 @@
 #include <queue>
 
 namespace FactoryWorld {
+  /** \class Scheduler
+   * Scheduler class handles the planning by expressing it under
+   * linear constraints.
+   *
+   * \todo
+   * - Scheduler should take some unmutable Factory as data input, here a shared_ptr is clearly not a right choise.
+   * - Need a faster solution for this task. The current version cannot effectively solve product size of over 200.
+   *
+   * The current implementation has 19 linear constraints expressing the factory scheduling model.
+   * To discuss these constraints, we first need the following notations:
+   *
+   * \f$ i, j \f$: index of order i, j
+   *
+   * \f$ p, q \f$: index of product p, q
+   *
+   * \f$ k \f$: index of production line k
+   *
+   * \f$ T_i \f$: tardy time of order i
+   *
+   * \f$ E_i \f$: early time of order i
+   *
+   * \f$ Z_{pk} \f$: the product p is scheduled on production line k
+   *
+   * \f$ Y_{pqk} \f$: product p directly precedes product q on line k
+   *
+   * \f$ DH_{pk} \f$: the first production of k is product p if true, dicision variable, abbrev.: dummy head, or dummy precedence
+   *
+   * \f$ DT_{pk} \f$: the last production of k is product p if true, dicision variable, abbrev.: dummy tail, or dummy succedent
+   *
+   * \f$ S_p \f$: production start time of product p
+   *
+   * \f$ C_{max} \f$: make span of planner
+   *
+   * \f$ C_i \f$: product completion of order i
+   *
+   * \f$  \f$:
+   */
+
   template <typename ... IndexTypes>
   std::string makeName(std::string prefix, IndexTypes ... nums) {
     if (sizeof...(nums)) return prefix + '_' + utils::numToBracket(nums...) + '_';

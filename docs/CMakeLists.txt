@@ -12,6 +12,9 @@ if (DOXYGEN_FOUND)
   set(PLANLAB_APS_PROJECT_NAME "Planlab-APS")
   set(PLANLAB_APS_VERSION "0.0")
   set(PLANLAB_APS_DOXY_INPUT "${CMAKE_CURRENT_SOURCE_DIR}/../src\" \"${CMAKE_CURRENT_SOURCE_DIR}/../include")
+  set(PLANLAB_APS_ENABLE_SECTIONS "\"Constraints\"")
+
+  set(PLANLAB_APS_INTERNAL_DOCUMENTATION "NO")
 
   # request to configure the file
   configure_file(${DOXYGEN_IN} ${DOXYGEN_OUT})

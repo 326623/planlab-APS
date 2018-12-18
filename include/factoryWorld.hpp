@@ -123,8 +123,8 @@ namespace FactoryWorld {
     explicit RelationOfProducts(MatrixXd bom, MatrixTime gap) :
       bom_(bom), predecessor_(
         (MatrixXd::Identity(bom.rows(), bom.cols()) - bom_).inverse()),
-      gapProduct_(gap), typeSize__(bom.rows()),
-      productTransCost_(bom.rows(), bom.cols())
+      gapProduct_(gap), productTransCost_(bom.rows(), bom.cols()),
+      typeSize__(bom.rows())
     {
       CHECK_EQ(bom.rows(), bom.cols()) << "bom matrix not square.";
       // NOTE: might need to consider predecessor.
@@ -190,7 +190,7 @@ namespace FactoryWorld {
       CHECK_EQ(productQuan.size(), productType.size());
     }
 
-    explicit Order(std::ifstream &);
+    // explicit Order(std::ifstream &);
 
     const std::vector<Integral> &
     getProductQuan() const { return productQuan_; }
@@ -207,7 +207,6 @@ namespace FactoryWorld {
     std::size_t size() const
     { return productType_.size(); }
   };
-
 
   class Factory {
   private:
@@ -248,13 +247,8 @@ namespace FactoryWorld {
   std::ostream &operator<< (std::ostream &out, const Order &order);
 
   /**
-   * Scheduler class handles the planning by expressing it under
-   * linear constraint
-   *
-   * @f$ v_n = \frac{1}{n^2} \sum_{k=1}^n \frac{6k^2-2k}{n+3}\qquad\forall n=1,\ldots,m  @f$
-   * <a href="http://de.wikipedia.org/wiki/Grundumsatz#Harris-Benedict-Formel">Harris-Benedict-Formel</a>
-   * Itself would takes some unmutable Factory as data input
-   * compute and store some temporary variables
+   * \brief Scheduler takes a Factory <std::shared_ptr> and generate plans based on a
+   * linear constraint model.
    */
   class Scheduler {
   private:
@@ -390,6 +384,7 @@ namespace FactoryWorld {
     // used to compute time needed for each order or products on each machine
     //inline void computeTimeNeeded();
 
+    /// \cond Constraints
     inline std::vector<MPConstraint *> addConstraints_1(
       std::vector<MPVariable *> completionTimes,
       MPVariable const *makeSpan,
@@ -488,6 +483,8 @@ namespace FactoryWorld {
       const Var3D &dummySucc,
       MPSolver &solver, const std::string &purposeMessage);
 
+    /// \endcond
+
   public:
     explicit Scheduler() {}
 
@@ -498,4 +495,142 @@ namespace FactoryWorld {
   };
 }
 
+namespace FactoryWorld {
+    /** \class Machine
+   * \brief   Contains information of production line.
+   *
+   * \fn Machine::capable
+   * \brief   If the production line can produce this type represented by index.
+   *
+   * \fn explicit Machine::Machine(std::vector<Float> capability, Float readyTime)
+   * \brief   Construct product line given information.
+   * \param[in]   capability   products per unit time, i.e. speed of production, each product type.
+   * \param[in]   readyTime    No product can be scheduled before this time.
+   *
+   * \fn bool Machine::capable(Integral typeIndex) const
+   * \brief   if the line can produce this product by index.
+   * \param[in]   typeIndex   product index.
+   *
+   * \fn Float Machine::produceTime(Integral typeIndex, Integral numProduct) const
+   * \brief   the time needed to produce 1 unit of some product.
+   * \param[in]   typeIndex   product index.
+   * \param[in]   numProduct  the number of products.
+   *
+   * \fn const std::vector<bool> & Machine::getCapableProduct() const
+   * \brief   Returns the boolean vector indicating product capabilities.
+   *
+   * \fn const std::vector<Float> & Machine::getCapability() const
+   * \brief   Returns the product per unit time of all products.
+   *
+   */
+
+  /** \class RelationOfProducts
+   * \brief   This class contains the relational information between products.
+   *
+   * This is the Generalization of Bill of Material(BOM) model, with the following types of relation:
+   * - Dependency between two products, i.e., one product precedes another.
+   * - Mutex between two products, i.e., enforce time interval between two products.
+   * - Transcation Costs between products.
+   *
+   * \fn   explicit RelationOfProducts::RelationOfProducts(MatrixXd bom, MatrixTime gap)
+   * Checking of constraints will be done inside:
+   * - Both bom and gap must be square.
+   * - No negative value in bom and gap.
+   * -
+   * \param[in]   MatrixXd   bom dependency matrix, number of products to produce another.
+   * \param[in]   MatrixTime time gap between two products.
+   *
+   * \fn const RelationOfProducts::MatrixXd &getBOM() const
+   * \brief Getter for Bom matrix.
+   *
+   * \fn const MatrixXd &RelationOfProducts::getPredecessor() const
+   * \brief Getter for predecessor, the product num required directly or indirectly.
+   *
+   * Computed directly from this formula, with B as BOM matrix, M as directly or indirectly dep matrix:
+   * \f[ M = BM + I \Rightarrow M = (I - B)^{-1} \f]
+   * Given that:
+   * \f[ M_{ij} = \sum_{k=1}^n B_{ik}M_{kj}, \forall i \ne j \f]
+   * \f[ m_{ii} = 1 \f]
+   *
+   * \fn const MatrixB &RelationOfProducts::getDirectMask() conts
+   * \brief Boolean mask matrix from BOM matrix.
+   *
+   * \fn const MatrixB &RelationOfProducts::getInAndDirectMask() const
+   * \brief Boolean mask matrix from predecessor matirx.
+   *
+   * \fn const MatrixTime &RelationOfProducts::getGap() const
+   * \brief Gap time matrix between two products.
+   *
+   * \fn const MatrixB &RelationOfProducts::getGapMask() const
+   * \brief Boolean mask matrix from gap matrix.
+   *
+   * \fn const MatrixTime &RelationOfProducts::getProductTransCost() const
+   * \brief Product transaction cost matrix.
+   *
+   * \fn Integral RelationOfProducts::getTypeSize() const
+   * \brief Number of total products.
+   */
+
+  /** \class Order
+   * \brief Information of order.
+   *
+   * - Product type.
+   * - Product quantity.
+   * - Due time
+   * - Client id
+   * - Material date
+   *
+   * \fn explicit Order::Order(std::vector<Integral> productQuan,
+   *                           std::vector<Integral> productType,
+   *                           Float dueTime, Integral clientID, Integral materialDate)
+   *
+   * The length of product quantity and product type will be checked.
+   *
+   * \fn const std::vector<Integral> & Order::getProductQuan() const
+   * \brief Vector of product quantities of the order.
+   *
+   * \fn const std::vector<Integral> & Order::getProductType() const
+   * \brief Vector of product type of the order.
+   *
+   * \fn TimeUnit Order::getDueTime() const
+   * \brief Due time of the order.
+   *
+   * \fn Integral Order::getClientID() const
+   * \brief Client id of the order.
+   *
+   * \fn Integral Order::getMaterialDate() const
+   * \brief Matrerial date of the order.
+   *
+   * \fn std::size_t Order::size() const
+   * \brief Number of products of the order.
+   */
+
+  /** \class Factory
+   * \brief This class encapsulates all the information needed by the planner.
+   *
+   * \fn void Factory::load(const std::string &filename)
+   * \brief Load from the file with the specified format.
+   *
+   * Format: TODO
+   *
+   * \fn const Factory::RelationOfProducts & Factory::getBOM() const
+   * \brief The relational info of all products.
+   *
+   * \fn const std::vector<Order> & Factory::getOrders() const
+   * \brief Vector of all orders.
+   *
+   * \fn const std::vector<Machine> & Factory::getMachines() const
+   * \brief Vector of all production lines
+   *
+   * \fn Float Factory::getTardyCost() const
+   * \brief Cost per unit time for not delivering products on time.
+   *
+   * \fn Float Factory::getEarlyCost() const
+   * \brief Cost per unit time for products on stocks.
+   *
+   * \fn Float Factory::getIdleCost() const
+   * \brief Cost per unit time for idle production lines.
+   *
+   */
+}
 #endif /* _NEWJOY_FACTORYWORLD_HPP_ */
