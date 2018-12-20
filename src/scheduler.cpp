@@ -15,11 +15,13 @@ namespace FactoryWorld {
    * The current implementation has 19 linear constraints expressing the factory scheduling model.
    * To discuss these constraints, we first need the following notations:
    *
-   * \f$ i, j \f$: index of order i, j
+   * \f$ i, j \f$: index of order i, j. i, j = 1, 2, \f$ \cdots \f$, N
    *
-   * \f$ p, q \f$: index of product p, q
+   * \f$ p, q \f$: index of product p, q. p, q = 1, 2, \f$ \cdots \f$, P
    *
-   * \f$ k \f$: index of production line k
+   * \f$ k \f$: index of production line k. k = 1, 2, \f$ \cdots \f$, M
+   *
+   * \section model_var planning variables:
    *
    * \f$ T_i \f$: tardy time of order i
    *
@@ -29,9 +31,9 @@ namespace FactoryWorld {
    *
    * \f$ Y_{pqk} \f$: product p directly precedes product q on line k
    *
-   * \f$ DH_{pk} \f$: the first production of k is product p if true, dicision variable, abbrev.: dummy head, or dummy precedence
+   * \f$ DH_{pk} \f$: the first production of line k is product p if \f$ DH_{pk} \f$ is true, dicision variable, abbrev.: dummy head, or dummy precedence
    *
-   * \f$ DT_{pk} \f$: the last production of k is product p if true, dicision variable, abbrev.: dummy tail, or dummy succedent
+   * \f$ DT_{pk} \f$: the last production of line k is product p if \f$ DT_{pk} \f$ is true, dicision variable, abbrev.: dummy tail, or dummy succedent
    *
    * \f$ S_p \f$: production start time of product p
    *
@@ -39,7 +41,87 @@ namespace FactoryWorld {
    *
    * \f$ C_i \f$: product completion of order i
    *
-   * \f$  \f$:
+   * \f$ L_i \f$: unit time of tardy production of order i
+   *
+   * \f$ E_i \f$: unit time of eardy production of order i
+   *
+   * \section model_parm Predetermined parameters:
+   *
+   * \f$ t_{pk} \f$: required time for product p on line k
+   *
+   * \f$ r_k \f$: ready time of line k
+   *
+   * \f$ d_i \f$: due time of order i
+   *
+   * \f$ F_p \f$: the set of production line that can manufacture product p
+   *
+   * \f$ R \f$: set of dependent relationnal pairs, with \f$ (p, q) \in R \f$, means that q must be processed before p
+   *
+   * \f$ G \f$: Set of tuple gap time between product p, q, with \f$ (p, q, t) \in G \f$. means that these two products' scheduled interval must be larger than t. Note that this relation is symmetric.
+   *
+   * \f$ WP_i \f$: Order i preparation time, cannot schedule any products of i before this time
+   *
+   * \f$ P_i \f$: product set of order i, all products belong to order i
+   *
+   * \f$ WT_{pq} \f$: transfer time(setup time) from product p to product q
+   *
+   * \f$ IC \f$: idle cost per unit time
+   *
+   * \f$ TC \f$: tardy cost per unit time
+   *
+   * \f$ EC \f$: early cost per unit time
+   *
+   * \f$ LN \f$: Large number for special linear constriants. Numerical experiments show that if too large would affect solving speed and even unable to solve because of the unstability.
+   *
+   * Next we formulate the objective functions of the problem:
+   *
+   * \f[ f_1 = (M C_{max} - \sum_{p=1}^{P}\sum_{k \in F_p}{Z_{pk} t_{pk} + \sum_{k=1}^P r_k}), \f]
+   * \f[ f_2 = (\sum_{i=1}^N {L_i}), \f]
+   * \f[ f_3 = (\sum_{i=1}^N {E_i}), \f]
+   * \f[ f = IC \cdot f_1 + TC \cdot f_2 + EC \cdot f_3 \f]
+   *
+   * We then have the following linear constraints:
+   *
+   *
+   * \f$ C_i \le C_{max}, i=1,2,\cdots,N \f$  completion time should precede make span
+   *
+   * \f$ \displaystyle{S_p + \sum_{k \in F_p} {t_{pk} Z_{pk}} \le C_i ,\ \ \forall p \in P_i} \f$  completion time later than all finished time of products
+   *
+   * \f$ \displaystyle{S_q + \sum_{k \in F_q} {t_{qk} Z_{qk}} \le S_p ,\ \ \forall (p, q) \in R} \f$ dependent relation between products of same order(R is constructed by combining the dep information of BOM and same order product)
+   *
+   * \f$ \displaystyle{S_q + \sum_{k} {t_{qk} Z_{qk}} + t \le S_p,\ \ \ \forall (p, q, t) \in G} \f$.
+   *
+   * \f$ WP_i \le S_p, \ \ \forall p \in P_i \f$ manufacturing wait raw material
+   *
+   * \f$ \displaystyle{\sum_{k \in F_p} r_k Z_{pk} \le S_p, \ \ \forall p} \f$ manufacturing when machine is ready
+   *
+   * \f$ S_p + t_{pk} + WT_{pq} Y_{pqk} - LN(1 - Y_{pqk}) \le S_q ,\ \ \forall p, q, k \in K_p \cap K_q \f$ immediate pair should wait with transfer cost
+   *
+   * \f$ 2(Y_{pqk} + Y_{qpk}) \le Z_{pk} + Z_{qk}, \ \ \forall p, q, k \in K_p \cap K_q \f$ immediate pair asymmetric on same line
+   *
+   * \f$ \displaystyle{\sum_{k=1}^M Z_{pk} = 1, \ \ \forall p} \f$ product only on 1 line
+   *
+   * \f$ \displaystyle{\sum_{k \notin F_p} Z_{pk} \le 0, \ \ \forall p} \f$ product only on capable line
+   *
+   * Enforce sequential order of production line, i.e., Some product p can be the head of line k.
+   * In this case \f$ Y_{qpk} = 0 \ \ \forall q, k \f$, therefore we need \f$ DH_{pk} \f$ to
+   * specifically amend this. Likewise, if product p is the tail of line k blablabla.
+   *
+   * \f$ \displaystyle{\sum_{q \ne p} {\sum_{k=1}^{M} Y_{qpk}} + \sum_{k=1}^M DH_{pk} = 1},\ \ \forall p \f$
+   *
+   * \f$ \displaystyle{\sum_{q \ne p} {\sum_{k=1}^{M} Y_{pqk}} + \sum_{k=1}^M DT_{pk} = 1},\ \ \forall p \f$
+   *
+   * \f$ 0 \le L_i, \ \ C_i - d_i \le L_i, \ \ \forall i \f$ tardy unit time constraints
+   *
+   * \f$ 0 \le E_i, \ \ d_i - C_i \le L_i, \ \ \forall i \f$ early unit time constraints
+   *
+   * \f$ \displaystyle{\sum_{p=1}^{N} {DH_{pk}}, \ \ \forall k} \f$ There can only be one head production for line k
+   *
+   * \f$ \displaystyle{\sum_{p=1}^{N} {DT_{pk}}, \ \ \forall k} \f$ There can only be one tail production for line k
+   *
+   * \f$ DH_{pk} \le Z_{pk}, \ \ \forall p, k \f$ product not head if not on the line
+   *
+   * \f$ DT_{pk} \le Z_{pk}, \ \ \forall p, k \f$ product not tail if not on the line
    */
 
   template <typename ... IndexTypes>
@@ -1051,7 +1133,7 @@ namespace FactoryWorld {
     addConstraints_2(startTime, completionTimes, onMachine, solver,
       "CompletionTime later than all finished time of product");
     addConstraints_3(startTime, onMachine, solver,
-      "dependent relation between product of same order");
+      "dependent relation between products of same order");
     addConstraints_4(startTime, onMachine, solver,
       "gap between products");
     addConstraints_5(startTime, solver,
