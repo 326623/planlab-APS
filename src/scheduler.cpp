@@ -15,11 +15,11 @@ namespace FactoryWorld {
    * The current implementation has 19 linear constraints expressing the factory scheduling model.
    * To discuss these constraints, we first need the following notations:
    *
-   * \f$ i, j \f$: index of order i, j. i, j = 1, 2, \f$ \cdots \f$, N
+   * \f$ i, j \f$: index of order i, j. i, j = 1, 2, \f$ \cdots \f$, N. N is the number of orders.
    *
-   * \f$ p, q \f$: index of product p, q. p, q = 1, 2, \f$ \cdots \f$, P
+   * \f$ p, q \f$: index of product p, q. p, q = 1, 2, \f$ \cdots \f$, P. P is the number of products.
    *
-   * \f$ k \f$: index of production line k. k = 1, 2, \f$ \cdots \f$, M
+   * \f$ k \f$: index of production line k. k = 1, 2, \f$ \cdots \f$, M. M is the number of production lines.
    *
    * \section model_var planning variables:
    *
@@ -107,9 +107,9 @@ namespace FactoryWorld {
    * In this case \f$ Y_{qpk} = 0 \ \ \forall q, k \f$, therefore we need \f$ DH_{pk} \f$ to
    * specifically amend this. Likewise, if product p is the tail of line k blablabla.
    *
-   * \f$ \displaystyle{\sum_{q \ne p} {\sum_{k=1}^{M} Y_{qpk}} + \sum_{k=1}^M DH_{pk} = 1},\ \ \forall p \f$
+   * \f$ \displaystyle{\sum_{q \ne p} {\sum_{k \in F_p \cap F_q} Y_{qpk}} + \sum_{k \in F_p \cap F_q}^M DH_{pk} = 1},\ \ \forall p \f$
    *
-   * \f$ \displaystyle{\sum_{q \ne p} {\sum_{k=1}^{M} Y_{pqk}} + \sum_{k=1}^M DT_{pk} = 1},\ \ \forall p \f$
+   * \f$ \displaystyle{\sum_{q \ne p} {\sum_{k \in F_p \cap F_q}^{M} Y_{pqk}} + \sum_{k \in F_p \cap F_q}^M DT_{pk} = 1},\ \ \forall p \f$
    *
    * \f$ 0 \le L_i, \ \ C_i - d_i \le L_i, \ \ \forall i \f$ tardy unit time constraints
    *
@@ -738,7 +738,7 @@ namespace FactoryWorld {
       for (auto p = 0ul; p < orders[i].size(); ++ p) {
         const auto &typeIndex_p = orders[i].getProductType()[p];
         for (auto k = 0ul; k < machines.size(); ++ k) {
-          //if (!machines[k].capable(typeIndex_p)) continue;
+          if (!machines[k].capable(typeIndex_p)) continue;
           constraintsPrec[i][p]->SetCoefficient(dummyPrec[i][p][k], 1);
         }
       }
@@ -780,7 +780,7 @@ namespace FactoryWorld {
       for (auto p = 0ul; p < orders[i].size(); ++ p) {
         const auto &typeIndex_p = orders[i].getProductType()[p];
         for (auto k = 0ul; k < machines.size(); ++ k) {
-          //if (!machines[k].capable(typeIndex_p)) continue;
+          if (!machines[k].capable(typeIndex_p)) continue;
           constraintsSucc[i][p]->SetCoefficient(dummySucc[i][p][k], 1);
         }
       }
@@ -983,7 +983,7 @@ namespace FactoryWorld {
       for (auto i = 0ul; i < sizeOrder; ++ i) {
         const auto sizeProduct = dummyPrec[i].size();
         for (auto p = 0ul; p < sizeProduct; ++ p) {
-          //if (!machines[k].capable(p)) continue;
+          if (!machines[k].capable(p)) continue;
           constraints.emplace_back(
             solver.MakeRowConstraint(-infinity, 0,
               makeName(purposeMessage, i, p, k)));
@@ -1006,6 +1006,7 @@ namespace FactoryWorld {
     MPSolver &solver, const std::string &purposeMessage) {
     std::vector<MPConstraint *> constraints;
     const auto sizeOrder = dummySucc.size();
+    const auto &machines = dataProvider__.getMachines();
     const auto machineSize = dataProvider__.getMachines().size();
 
     for (auto k = 0ul; k < machineSize; ++ k) {
@@ -1013,6 +1014,7 @@ namespace FactoryWorld {
       for (auto i = 0ul; i < sizeOrder; ++ i) {
         const auto sizeProduct = dummySucc[i].size();
         for (auto p = 0ul; p < sizeProduct; ++ p) {
+          if (!machines[k].capable(p)) continue;
           constraints.emplace_back(
             solver.MakeRowConstraint(-infinity, 0,
               makeName(purposeMessage, i, p, k)));
@@ -1030,8 +1032,8 @@ namespace FactoryWorld {
 
 
   void Scheduler::factoryScheduler(std::shared_ptr<const Factory> factory,
-    MPSolver::OptimizationProblemType optimization_problem_type,
-    double lambda, double timeLimit)
+                                   MPSolver::OptimizationProblemType optimization_problem_type,
+                                   double lambda, double timeLimit, std::ofstream &outputStream)
   {
     dataProvider__ = DataProvider(factory);
     factory__ = factory;
@@ -1312,60 +1314,78 @@ namespace FactoryWorld {
       for (auto p = 0ul; p < startTime[i].size(); ++ p) {
         for (auto k = 0ul; k < onMachine[i][p].size(); ++ k) {
           if (onMachine[i][p][k]->solution_value()) {
-            std::cout << makeName("product", i, p) << ' '
-                      << startTime[i][p]->solution_value() << ' '
-                      << " on line " << k << " requires "
-                      << orders[i].requiredTime(p, k) << k;
+            outputStream << i << ' ' << p << ' ' << k << ' '
+                         << startTime[i][p]->solution_value() << ' '
+                         << startTime[i][p]->solution_value() + orders[i].requiredTime(p, k);
           }
         }
-        std::cout << '\n';
+        outputStream << '\n';
       }
     }
 
-    for (auto i = 0ul; i < immediatePrec.size(); ++ i) {
-      for (auto p = 0ul; p < immediatePrec[i].size(); ++ p) {
-        for (auto j = 0ul; j < immediatePrec[i][p].size(); ++ j) {
-          for (auto q = 0ul; q < immediatePrec[i][p][j].size(); ++ q) {
-            for (auto k = 0ul; k < immediatePrec[i][p][j][q].size(); ++ k) {
-              if (i == j && p == q) continue;
-              if (immediatePrec[i][p][j][q][k]->solution_value() &&
-                onMachine[i][p][k]->solution_value() && onMachine[j][q][k]->solution_value()) {
-                std::cout << makeName("product", i, p)
-                          << " precedes "
-                          << makeName("product", j, q)
-                          << " on "
-                          << makeName("machine", k)
-                          << '\n';
-              }
-            }
-          }
-        }
-      }
-    }
+    // for (auto i = 0ul; i < startTime.size(); ++ i) {
+    //   for (auto p = 0ul; p < startTime[i].size(); ++ p) {
+    //     for (auto k = 0ul; k < onMachine[i][p].size(); ++ k) {
+    //       if (onMachine[i][p][k]->solution_value()) {
+    //         std::cout << makeName("product", i, p) << ' '
+    //                   << startTime[i][p]->solution_value() << ' '
+    //                   << " on line " << k << " requires "
+    //                   << orders[i].requiredTime(p, k) << k;
+    //       }
+    //     }
+    //     std::cout << '\n';
+    //   }
+    // }
 
-    for (auto i = 0ul; i < dummyPrec.size(); ++ i) {
-      for (auto p = 0ul; p < dummyPrec[i].size(); ++ p) {
-        for (auto k = 0ul; k < dummyPrec[i][p].size(); ++ k) {
-          if (dummyPrec[i][p][k]->solution_value()) {
-            std::cout << makeName("product", i, p)
-                      << " is the first on line "
-                      << k << '\n';
-          }
-        }
-      }
-    }
+    // for (auto i = 0ul; i < immediatePrec.size(); ++ i) {
+    //   for (auto p = 0ul; p < immediatePrec[i].size(); ++ p) {
+    //     for (auto j = 0ul; j < immediatePrec[i][p].size(); ++ j) {
+    //       for (auto q = 0ul; q < immediatePrec[i][p][j].size(); ++ q) {
+    //         for (auto k = 0ul; k < immediatePrec[i][p][j][q].size(); ++ k) {
+    //           if (i == j && p == q) continue;
+    //           if (immediatePrec[i][p][j][q][k]->solution_value() &&
+    //               (onMachine[i][p][k]->solution_value() && onMachine[j][q][k]->solution_value())) {
+    //             std::cout << makeName("product", i, p)
+    //                       << " precedes "
+    //                       << makeName("product", j, q)
+    //                       << " on "
+    //                       << makeName("machine", k)
+    //                       << '\n';
+    //           }
+    //         }
+    //       }
+    //     }
+    //   }
+    // }
 
-    for (auto i = 0ul; i < dummySucc.size(); ++ i) {
-      for (auto p = 0ul; p < dummySucc[i].size(); ++ p) {
-        for (auto k = 0ul; k < dummySucc[i][p].size(); ++ k) {
-          if (dummySucc[i][p][k]->solution_value()) {
-            std::cout << makeName("product", i, p)
-                      << " is the last on line "
-                      << k << '\n';
-          }
-        }
-      }
-    }
+    // for (auto i = 0ul; i < dummyPrec.size(); ++ i) {
+    //   for (auto p = 0ul; p < dummyPrec[i].size(); ++ p) {
+    //     for (auto k = 0ul; k < dummyPrec[i][p].size(); ++ k) {
+    //       if (dummyPrec[i][p][k]->solution_value() &&
+    //           onMachine[i][p][k]->solution_value()) {
+    //         std::cout << makeName("product", i, p)
+    //                   << " is the first on line "
+    //                   << k << '\n';
+    //       }
+    //     }
+    //   }
+    // }
+
+    // for (auto i = 0ul; i < dummySucc.size(); ++ i) {
+    //   for (auto p = 0ul; p < dummySucc[i].size(); ++ p) {
+    //     std::cout << i << ',' << p << ": ";
+    //     for (auto k = 0ul; k < dummySucc[i][p].size(); ++ k) {
+    //       // if (dummySucc[i][p][k]->solution_value() &&
+    //       //     onMachine[i][p][k]->solution_value()) {
+    //       //   std::cout << makeName("product", i, p)
+    //       //             << " is the last on line "
+    //       //             << k << '\n';
+    //       // }
+    //       std::cout << dummySucc[i][p][k]->solution_value() << ' ';
+    //     }
+    //     std::cout << '\n';
+    //   }
+    // }
 
     // for (auto i = 0ul; i < machines.size(); ++ i) {
     //   if (machines[i].capable(46)) {
