@@ -5,6 +5,7 @@ find_package( Eigen3 3.3 REQUIRED NO_MODULE)
 set(CMAKE_CXX_STANDARD 11)
 # dependency
 add_subdirectory( deps/or-tools )
+add_subdirectory( deps/json )
 
 if(MSVC)
   add_compile_options(/W3 /WX)
@@ -19,7 +20,7 @@ LIST(APPEND SOURCES
   src/scheduler.cpp)
 add_library( Factory SHARED ${SOURCES} )
 target_include_directories( Factory PUBLIC "${CMAKE_CURRENT_LIST_DIR}/include" )
-target_link_libraries( Factory PUBLIC ortools::ortools Eigen3::Eigen )
+target_link_libraries( Factory PUBLIC ortools::ortools Eigen3::Eigen nlohmann_json::nlohmann_json )
 
 add_executable( firstApp src/test.cpp )
 target_link_libraries( firstApp Factory )

@@ -25,51 +25,56 @@
 #ifndef _NEWJOY_UTILS_HPP_
 #define _NEWJOY_UTILS_HPP_
 
-#include <functional>
 #include <algorithm>
+#include <functional>
 #include <memory>
+
 namespace utils {
-  /*
-   * Implement the almost_equal mostly for floating point comparason
-   * snippets from std library
-   */
-  template<class T>
-  typename std::enable_if<!std::numeric_limits<T>::is_integer, bool>::type
-  almost_equal(T x, T y, int ulp = 1)
-  // as in how many unit of precision, let's default to 1
-  {
-    // the machine epsilon has to be scaled to the magnitude of the values used
-    // and multiplied by the desired precision in ULPs (units in the last place)
-    return std::abs(x-y) <= std::numeric_limits<T>::epsilon() * std::abs(x+y) * ulp
-      // unless the result is subnormal
-      || std::abs(x-y) < std::numeric_limits<T>::min();
-  }
-
-  template <typename ForwardIterator, typename BinaryOperation>
-  void permPair(ForwardIterator first, ForwardIterator last, BinaryOperation f) {
-    for (auto iter1 = first; iter1 != last; ++ iter1)
-      for (auto iter2 = iter1+1; iter2 != last; ++ iter2)
-        f(iter1, iter2);
-  }
-
-  template <typename ... Args>
-  std::string numPacking() {
-    return "";
-  }
-
-  template <typename IndexType, typename ... Args>
-  std::string numPacking(IndexType head, Args ... tail) {
-    if (sizeof...(tail))
-      return std::to_string(head) + ',' + numPacking(tail...);
-    else
-      return std::to_string(head);
-  }
-
-  template <typename ... IndexTypes>
-  std::string numToBracket(IndexTypes ... indices) {
-    return '[' + numPacking(indices...) + ']';
-  }
-
+/*
+ * Implement the almost_equal mostly for floating point comparason
+ * snippets from std library
+ */
+template <class T>
+typename std::enable_if<!std::numeric_limits<T>::is_integer, bool>::type
+almost_equal(T x, T y, int ulp = 1)
+// as in how many unit of precision, let's default to 1
+{
+  // the machine epsilon has to be scaled to the magnitude of the values used
+  // and multiplied by the desired precision in ULPs (units in the last place)
+  return std::abs(x - y) <=
+             std::numeric_limits<T>::epsilon() * std::abs(x + y) * ulp
+         // unless the result is subnormal
+         || std::abs(x - y) < std::numeric_limits<T>::min();
 }
+
+template <typename ForwardIterator, typename BinaryOperation>
+void permPair(ForwardIterator first, ForwardIterator last, BinaryOperation f) {
+  for (auto iter1 = first; iter1 != last; ++iter1)
+    for (auto iter2 = iter1 + 1; iter2 != last; ++iter2) f(iter1, iter2);
+}
+
+template <typename... Args>
+std::string numPacking() {
+  return "";
+}
+
+template <typename IndexType, typename... Args>
+std::string numPacking(IndexType head, Args... tail) {
+  if (sizeof...(tail))
+    return std::to_string(head) + ',' + numPacking(tail...);
+  else
+    return std::to_string(head);
+}
+
+template <typename... IndexTypes>
+std::string numToBracket(IndexTypes... indices) {
+  return '[' + numPacking(indices...) + ']';
+}
+
+template<typename T, typename... Args>
+std::unique_ptr<T> make_unique(Args&&... args) {
+  return std::unique_ptr<T>(new T(std::forward<Args>(args)...));
+}
+} // namespace utils
 
 #endif /* _NEWJOY_UTILS_HPP_ */

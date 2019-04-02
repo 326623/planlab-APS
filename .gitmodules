@@ -1,3 +1,9 @@
 [submodule "deps/or-tools"]
 	path = deps/or-tools
 	url = https://github.com/google/or-tools
+[submodule "deps/json"]
+	path = deps/json
+	url = https://github.com/nlohmann/json
+[submodule "gantt"]
+	path = gantt
+	url = https://github.com/326623/gantt
