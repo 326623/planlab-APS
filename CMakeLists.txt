@@ -11,8 +11,8 @@ if(MSVC)
   add_compile_options(/W3 /WX)
 else()
   #add_compile_options(-W -Wall)
-  add_compile_options(-W -Wall)
-  set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -ggdb -O0")
+  add_compile_options(-W -Wall -fno-omit-frame-pointer)
+  set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -ggdb -O0 -fno-omit-frame-pointer")
 endif()
 
 LIST(APPEND SOURCES

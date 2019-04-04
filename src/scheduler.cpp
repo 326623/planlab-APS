@@ -1252,135 +1252,26 @@ void Scheduler::factoryScheduler(
 
   LOG(INFO) << "Number of constraints " << solver->NumConstraints();
   LOG(INFO) << "Number of variables " << solver->NumVariables();
+  LOG(INFO) << "Using solver: " << solver->SolverVersion();
   solver->set_time_limit(timeLimit);
   // std::cout << solver->time_limit() << '\n';
 
   //    std::cout << solver->ComputeExactConditionNumber() << '\n';
   //    solver->ClampSolutionWithinBounds();
-  solver->Solve();
+  std::string LPOutput;
+  // solver->ExportModelAsMpsFormat(true, false, &MPSOutput);
+  solver->ExportModelAsLpFormat(true, &LPOutput);
+  std::ofstream MPSOutStream("problem.lp");
+  MPSOutStream << LPOutput << std::endl;
+  // solver->Solve();
   // if (solver->VerifySolution(1e-8, true)) {
   //   LOG(INFO) << "No solution found";
   //   return;
   // }
 
-  collectInfoAndOutput(this, outputStream, lambda);
+  // collectInfoAndOutput(this, outputStream, lambda);
 
-  for (auto i = 0ul; i < startTime.size(); ++i) {
-    for (auto p = 0ul; p < startTime[i].size(); ++p) {
-      for (auto k = 0ul; k < onMachine[i][p].size(); ++k) {
-        if (onMachine[i][p][k]->solution_value()) {
-          std::cout << i << ' ' << p << ' ' << k << ' '
-                    << startTime[i][p]->solution_value() << ' '
-                    << startTime[i][p]->solution_value() +
-                           orders[i].requiredTime(p, k);
-        }
-      }
-      std::cout << '\n';
-    }
-  }
-
-  // for (auto i = 0ul; i < startTime.size(); ++ i) {
-  //   for (auto p = 0ul; p < startTime[i].size(); ++ p) {
-  //     for (auto k = 0ul; k < onMachine[i][p].size(); ++ k) {
-  //       if (onMachine[i][p][k]->solution_value()) {
-  //         std::cout << makeName("product", i, p) << ' '
-  //                   << startTime[i][p]->solution_value() << ' '
-  //                   << " on line " << k << " requires "
-  //                   << orders[i].requiredTime(p, k) << k;
-  //       }
-  //     }
-  //     std::cout << '\n';
-  //   }
-  // }
-
-  for (auto j = 0ul; j < immediatePrec.size(); ++j) {
-    for (auto q = 0ul; q < immediatePrec[j].size(); ++q) {
-      for (auto i = 0ul; i < immediatePrec[j][q].size(); ++i) {
-        for (auto p = 0ul; p < immediatePrec[j][q][i].size(); ++p) {
-          const auto& typeIndex_p = orders[i].getProductType()[p];
-          const auto& typeIndex_q = orders[j].getProductType()[q];
-          for (auto k = 0ul; k < immediatePrec[j][q][i][p].size(); ++k) {
-            if (j == i && q == p) continue;
-            if (!machines[k].capable(typeIndex_p) ||
-                !machines[k].capable(typeIndex_q))
-              continue;
-            if (i == 4 && p == 0)
-              std::cout << i << ' ' << j << ' ' <<  q << ' ' << p << ' ' << k << ' '
-                        << immediatePrec[j][q][i][p][k]->solution_value() << '\n';
-          }
-        }
-      }
-    }
-  }
-
-  for (auto i = 0ul; i < orders.size(); ++i) {
-    for (auto p = 0ul; p < orders[i].size(); ++p) {
-      const auto& typeIndex_p = orders[i].getProductType()[p];
-      for (auto k = 0ul; k < machines.size(); ++k) {
-        if (!machines[k].capable(typeIndex_p)) continue;
-        if (i == 4 && p == 0)
-          std::cout << i << ' ' << p << ' ' << k << ' '
-                    << dummyPrec[i][p][k]->solution_value() << ' '
-                    << onMachine[i][p][k]->solution_value() << '\n';
-      }
-    }
-  }
-
-  for (auto i = 0ul; i < immediatePrec.size(); ++ i) {
-    for (auto p = 0ul; p < immediatePrec[i].size(); ++ p) {
-      for (auto j = 0ul; j < immediatePrec[i][p].size(); ++ j) {
-        for (auto q = 0ul; q < immediatePrec[i][p][j].size(); ++ q) {
-          for (auto k = 0ul; k < immediatePrec[i][p][j][q].size(); ++ k) {
-            if (i == j && p == q) continue;
-            if (immediatePrec[i][p][j][q][k]->solution_value() &&
-                (onMachine[i][p][k]->solution_value() &&
-                onMachine[j][q][k]->solution_value())) {
-              std::cout << makeName("product", i, p)
-                        << " precedes "
-                        << makeName("product", j, q)
-                        << " on "
-                        << makeName("machine", k)
-                        << '\n';
-            }
-          }
-        }
-      }
-    }
-  }
-
-  for (auto i = 0ul; i < dummyPrec.size(); ++ i) {
-    for (auto p = 0ul; p < dummyPrec[i].size(); ++ p) {
-      for (auto k = 0ul; k < dummyPrec[i][p].size(); ++ k) {
-        if (dummyPrec[i][p][k]->solution_value() &&
-            onMachine[i][p][k]->solution_value()) {
-          std::cout << makeName("product", i, p)
-                    << " is the first on line "
-                    << k << '\n';
-        }
-      }
-    }
-  }
-
-  for (auto i = 0ul; i < dummySucc.size(); ++ i) {
-    for (auto p = 0ul; p < dummySucc[i].size(); ++ p) {
-      for (auto k = 0ul; k < dummySucc[i][p].size(); ++ k) {
-        if (dummySucc[i][p][k]->solution_value() &&
-            onMachine[i][p][k]->solution_value()) {
-          std::cout << makeName("product", i, p)
-                    << " is the last on line "
-                    << k << '\n';
-        }
-      }
-    }
-  }
-
-  // for (auto i = 0ul; i < machines.size(); ++ i) {
-  //   if (machines[i].capable(46)) {
-  //     std::cout << i << ' ';
-  //   }
-  // }
-  std::cout << "end\n";
-  std::cout << objective->Value() << '\n';
+  // std::cout << objective->Value() << '\n';
 }
 
 /**
@@ -1460,14 +1351,126 @@ void collectInfoAndOutput(FactoryWorld::Scheduler* scheduler,
     outputJson["xticks"].emplace_back(scheduler->makeSpan->solution_value() /
                                       static_cast<double>(tickSize) *
                                       static_cast<double>(i));
-  // outputJson["packages"].emplace_back(nlohmann::json({{"line", "1"},
-  //                                                     {"item", "1"},
-  //                                                     {"package", "1"},
-  //                                                     {"start", 0},
-  //                                                     {"end", 4},
-  //                                                     {"ddl", 2},
-  //                                                     {"color", "black"}}));
+
   outputStream << outputJson << '\n';
 }
 
 }  // namespace FactoryWorld
+
+// debug segment
+// for (auto i = 0ul; i < startTime.size(); ++i) {
+//   for (auto p = 0ul; p < startTime[i].size(); ++p) {
+//     for (auto k = 0ul; k < onMachine[i][p].size(); ++k) {
+//       if (onMachine[i][p][k]->solution_value()) {
+//         std::cout << i << ' ' << p << ' ' << k << ' '
+//                   << startTime[i][p]->solution_value() << ' '
+//                   << startTime[i][p]->solution_value() +
+//                          orders[i].requiredTime(p, k);
+//       }
+//     }
+//     std::cout << '\n';
+//   }
+// }
+
+// for (auto i = 0ul; i < startTime.size(); ++ i) {
+//   for (auto p = 0ul; p < startTime[i].size(); ++ p) {
+//     for (auto k = 0ul; k < onMachine[i][p].size(); ++ k) {
+//       if (onMachine[i][p][k]->solution_value()) {
+//         std::cout << makeName("product", i, p) << ' '
+//                   << startTime[i][p]->solution_value() << ' '
+//                   << " on line " << k << " requires "
+//                   << orders[i].requiredTime(p, k) << k;
+//       }
+//     }
+//     std::cout << '\n';
+//   }
+// }
+
+// for (auto j = 0ul; j < immediatePrec.size(); ++j) {
+//   for (auto q = 0ul; q < immediatePrec[j].size(); ++q) {
+//     for (auto i = 0ul; i < immediatePrec[j][q].size(); ++i) {
+//       for (auto p = 0ul; p < immediatePrec[j][q][i].size(); ++p) {
+//         const auto& typeIndex_p = orders[i].getProductType()[p];
+//         const auto& typeIndex_q = orders[j].getProductType()[q];
+//         for (auto k = 0ul; k < immediatePrec[j][q][i][p].size(); ++k) {
+//           if (j == i && q == p) continue;
+//           if (!machines[k].capable(typeIndex_p) ||
+//               !machines[k].capable(typeIndex_q))
+//             continue;
+//           if (i == 4 && p == 0)
+//             std::cout << i << ' ' << j << ' ' <<  q << ' ' << p << ' ' << k
+//             << ' '
+//                       << immediatePrec[j][q][i][p][k]->solution_value() <<
+//                       '\n';
+//         }
+//       }
+//     }
+//   }
+// }
+
+// for (auto i = 0ul; i < orders.size(); ++i) {
+//   for (auto p = 0ul; p < orders[i].size(); ++p) {
+//     const auto& typeIndex_p = orders[i].getProductType()[p];
+//     for (auto k = 0ul; k < machines.size(); ++k) {
+//       if (!machines[k].capable(typeIndex_p)) continue;
+//       if (i == 4 && p == 0)
+//         std::cout << i << ' ' << p << ' ' << k << ' '
+//                   << dummyPrec[i][p][k]->solution_value() << ' '
+//                   << onMachine[i][p][k]->solution_value() << '\n';
+//     }
+//   }
+// }
+
+// for (auto i = 0ul; i < immediatePrec.size(); ++ i) {
+//   for (auto p = 0ul; p < immediatePrec[i].size(); ++ p) {
+//     for (auto j = 0ul; j < immediatePrec[i][p].size(); ++ j) {
+//       for (auto q = 0ul; q < immediatePrec[i][p][j].size(); ++ q) {
+//         for (auto k = 0ul; k < immediatePrec[i][p][j][q].size(); ++ k) {
+//           if (i == j && p == q) continue;
+//           if (immediatePrec[i][p][j][q][k]->solution_value() &&
+//               (onMachine[i][p][k]->solution_value() &&
+//               onMachine[j][q][k]->solution_value())) {
+//             std::cout << makeName("product", i, p)
+//                       << " precedes "
+//                       << makeName("product", j, q)
+//                       << " on "
+//                       << makeName("machine", k)
+//                       << '\n';
+//           }
+//         }
+//       }
+//     }
+//   }
+// }
+
+// for (auto i = 0ul; i < dummyPrec.size(); ++ i) {
+//   for (auto p = 0ul; p < dummyPrec[i].size(); ++ p) {
+//     for (auto k = 0ul; k < dummyPrec[i][p].size(); ++ k) {
+//       if (dummyPrec[i][p][k]->solution_value() &&
+//           onMachine[i][p][k]->solution_value()) {
+//         std::cout << makeName("product", i, p)
+//                   << " is the first on line "
+//                   << k << '\n';
+//       }
+//     }
+//   }
+// }
+
+// for (auto i = 0ul; i < dummySucc.size(); ++ i) {
+//   for (auto p = 0ul; p < dummySucc[i].size(); ++ p) {
+//     for (auto k = 0ul; k < dummySucc[i][p].size(); ++ k) {
+//       if (dummySucc[i][p][k]->solution_value() &&
+//           onMachine[i][p][k]->solution_value()) {
+//         std::cout << makeName("product", i, p)
+//                   << " is the last on line "
+//                   << k << '\n';
+//       }
+//     }
+//   }
+// }
+
+// for (auto i = 0ul; i < machines.size(); ++ i) {
+//   if (machines[i].capable(46)) {
+//     std::cout << i << ' ';
+//   }
+// }
