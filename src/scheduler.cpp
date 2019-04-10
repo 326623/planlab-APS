@@ -165,7 +165,7 @@ namespace FactoryWorld {
 template <typename... IndexTypes>
 std::string makeName(std::string prefix, IndexTypes... nums) {
   if (sizeof...(nums))
-    return prefix + '_' + utils::numToBracket(nums...) + '_';
+    return prefix + '_' + utils::numToParethese(nums...) + '_';
   else
     return prefix;
 }
@@ -1222,23 +1222,25 @@ void Scheduler::factoryScheduler(
           objective->SetCoefficient(onMachine[i][p][k], -time * idleCost);
         }
         // l1 normalization
-        objective->SetCoefficient(onMachine[i][p][k], lambda);
+        if (lambda > 0.0)
+          objective->SetCoefficient(onMachine[i][p][k], lambda);
       }
     }
   }
 
-  for (std::size_t i = 0; i < orderSize; ++i) {
-    for (auto p = 0ul; p < orders[i].size(); ++p) {
-      for (auto j = 0ul; j < orderSize; ++j) {
-        for (auto q = 0ul; q < orders[j].size(); ++q) {
-          for (auto k = 0ul; k < machines.size(); ++k) {
-            // l1 normalization
-            objective->SetCoefficient(immediatePrec[i][p][j][q][k], lambda);
-          }
-        }
-      }
-    }
-  }
+  // for (std::size_t i = 0; i < orderSize; ++i) {
+  //   for (auto p = 0ul; p < orders[i].size(); ++p) {
+  //     for (auto j = 0ul; j < orderSize; ++j) {
+  //       for (auto q = 0ul; q < orders[j].size(); ++q) {
+  //         for (auto k = 0ul; k < machines.size(); ++k) {
+  //           // l1 normalization
+  //           if (lambda > 0.0)
+  //             objective->SetCoefficient(immediatePrec[i][p][j][q][k], lambda);
+  //         }
+  //       }
+  //     }
+  //   }
+  // }
 
   // auto model =
   //     static_cast<OsiClpSolverInterface*>(solver->underlying_solver());
@@ -1261,15 +1263,11 @@ void Scheduler::factoryScheduler(
   //    solver->ClampSolutionWithinBounds();
   std::string LPOutput;
   // solver->ExportModelAsMpsFormat(true, false, &MPSOutput);
-  solver->ExportModelAsLpFormat(true, &LPOutput);
+  solver->ExportModelAsLpFormat(false, &LPOutput);
   std::ofstream MPSOutStream("problem.lp");
   MPSOutStream << LPOutput << std::endl;
   solver->Solve();
-  // if (solver->VerifySolution(1e-8, true)) {
-  //   LOG(INFO) << "No solution found";
-  //   return;
-  // }
-
+  // outputStream << "nothing\n";
   collectInfoAndOutput(this, outputStream, lambda);
 
   // std::cout << objective->Value() << '\n';
