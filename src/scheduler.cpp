@@ -3,6 +3,7 @@
 #include <nlohmann/json.hpp>
 #include <queue>
 #include "factoryWorld.hpp"
+#include <OsiClpSolverInterface.hpp>
 
 namespace FactoryWorld {
 /** \class Scheduler
@@ -1240,10 +1241,10 @@ void Scheduler::factoryScheduler(
   }
 
   // auto model =
-  // static_cast<OsiClpSolverInterface>(solver->underlying_solver());
-  // if (!model.haveMultiThreadSupport()) LOG(FATAL) << "end";
-  // model.setThreadMode(2);
-  // model.setNumberThreads(12);
+  //     static_cast<OsiClpSolverInterface*>(solver->underlying_solver());
+  // if (!model->haveMultiThreadSupport()) LOG(FATAL) << "end";
+  // model->setThreadMode(2);
+  // model->setNumberThreads(12);
 
   objective->SetMinimization();
   solver->EnableOutput();
@@ -1263,13 +1264,13 @@ void Scheduler::factoryScheduler(
   solver->ExportModelAsLpFormat(true, &LPOutput);
   std::ofstream MPSOutStream("problem.lp");
   MPSOutStream << LPOutput << std::endl;
-  // solver->Solve();
+  solver->Solve();
   // if (solver->VerifySolution(1e-8, true)) {
   //   LOG(INFO) << "No solution found";
   //   return;
   // }
 
-  // collectInfoAndOutput(this, outputStream, lambda);
+  collectInfoAndOutput(this, outputStream, lambda);
 
   // std::cout << objective->Value() << '\n';
 }

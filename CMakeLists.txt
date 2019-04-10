@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.8.2)
 project( planlab_ASP VERSION 0.1 )
 find_package( Eigen3 3.3 REQUIRED NO_MODULE)
 
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 14)
 # dependency
 add_subdirectory( deps/or-tools )
 add_subdirectory( deps/json )
