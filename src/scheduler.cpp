@@ -1228,20 +1228,30 @@ void Scheduler::factoryScheduler(
     }
   }
 
-  // for (std::size_t i = 0; i < orderSize; ++i) {
-  //   for (auto p = 0ul; p < orders[i].size(); ++p) {
-  //     for (auto j = 0ul; j < orderSize; ++j) {
-  //       for (auto q = 0ul; q < orders[j].size(); ++q) {
-  //         for (auto k = 0ul; k < machines.size(); ++k) {
-  //           // l1 normalization
-  //           if (lambda > 0.0)
-  //             objective->SetCoefficient(immediatePrec[i][p][j][q][k], lambda);
-  //         }
-  //       }
-  //     }
-  //   }
-  // }
+  for (std::size_t i = 0; i < orderSize; ++i) {
+    for (auto p = 0ul; p < orders[i].size(); ++p) {
+      for (auto j = 0ul; j < orderSize; ++j) {
+        for (auto q = 0ul; q < orders[j].size(); ++q) {
+          for (auto k = 0ul; k < machines.size(); ++k) {
+            // l1 normalization
+            if (lambda > 0.0)
+              objective->SetCoefficient(immediatePrec[i][p][j][q][k], lambda);
+          }
+        }
+      }
+    }
+  }
 
+  for (std::size_t i = 0; i < orderSize; ++i) {
+    for (auto p = 0ul; p < orders[i].size(); ++p) {
+      for (auto k = 0ul; k < machines.size(); ++k) {
+        if (lambda > 0.0) {
+          objective->SetCoefficient(dummyPrec[i][p][k], lambda);
+          objective->SetCoefficient(dummySucc[i][p][k], lambda);
+        }
+      }
+    }
+  }
   // auto model =
   //     static_cast<OsiClpSolverInterface*>(solver->underlying_solver());
   // if (!model->haveMultiThreadSupport()) LOG(FATAL) << "end";
