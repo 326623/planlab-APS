@@ -1272,8 +1272,9 @@ void Scheduler::factoryScheduler(
   //    std::cout << solver->ComputeExactConditionNumber() << '\n';
   //    solver->ClampSolutionWithinBounds();
   std::string LPOutput;
-  // solver->ExportModelAsMpsFormat(true, false, &MPSOutput);
+  // solver->ExportModelAsMpsFormat(true, false, &LPOutput);
   solver->ExportModelAsLpFormat(false, &LPOutput);
+  // std::ofstream MPSOutStream("problem.mps");
   std::ofstream MPSOutStream("problem.lp");
   MPSOutStream << LPOutput << std::endl;
   solver->Solve();
