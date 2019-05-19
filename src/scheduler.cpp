@@ -1210,7 +1210,8 @@ void Scheduler::factoryScheduler(
   for (auto k = 0ul; k < machines.size(); ++k) {
     readyTotal += machines[k].getReadyTime();
   }
-  objective->SetOffset(readyTotal);
+  // bug here, shouldn't affect things though, since it's constant
+  objective->SetOffset(-readyTotal);
 
   for (std::size_t i = 0; i < orderSize; ++i) {
     for (auto p = 0ul; p < orders[i].size(); ++p) {
