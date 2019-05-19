@@ -19,7 +19,7 @@
 
 static const char kUsage[] = "Usage: example program to load data";
 
-static bool ValidateFilename(const char*, const std::string& value) {
+static bool ValidateFilename(const char *flagname, const std::string &value) {
   return value.size() > 0;
 }
 
